@@ -37,6 +37,7 @@ import {
   Users,
   Award,
   FileText,
+  Sparkles,
 } from "lucide-react";
 
 export default function TeacherProfilePage() {
@@ -194,12 +195,17 @@ export default function TeacherProfilePage() {
     return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   };
 
+  // Check if user is new (created within last 30 days)
+  const isNewUser = user?.createdAt
+    ? (Date.now() - new Date(user.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000
+    : true;
+
   // Mock teacher stats
   const stats = [
-    { title: "إجمالي الطلاب", value: "٧٢", icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { title: "المجموعات النشطة", value: "٤", icon: BookOpen, color: "text-green-500", bg: "bg-green-500/10" },
-    { title: "صافي الأرباح", value: "٢٧٬٢٠٠ ج.م", icon: Wallet, color: "text-purple-500", bg: "bg-purple-500/10" },
-    { title: "التقييم", value: "٤.٩", icon: Star, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+    { title: "إجمالي الطلاب", value: isNewUser ? "٠" : "٧٢", icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { title: "المجموعات النشطة", value: isNewUser ? "٠" : "٤", icon: BookOpen, color: "text-green-500", bg: "bg-green-500/10" },
+    { title: "صافي الأرباح", value: isNewUser ? "٠ ج.م" : "٢٧٬٢٠٠ ج.م", icon: Wallet, color: "text-purple-500", bg: "bg-purple-500/10" },
+    { title: "التقييم", value: isNewUser ? "جديد" : "٤.٩", icon: Star, color: "text-yellow-500", bg: "bg-yellow-500/10" },
   ];
 
   const recentActivity = [
@@ -284,15 +290,24 @@ export default function TeacherProfilePage() {
                 <h3 className="text-xl font-bold">{user?.name || "المعلم"}</h3>
                 <p className="text-sm text-muted-foreground mt-1">معلم</p>
 
-                <div className="flex items-center gap-2 mt-3">
-                  <Badge variant="default" className="bg-green-500/10 text-green-600 hover:bg-green-500/20">
-                    <GraduationCap className="w-3 h-3 ml-1" />
-                    معلم معتمد
-                  </Badge>
-                  <Badge variant="outline">
-                    <Star className="w-3 h-3 ml-1 text-yellow-500" />
-                    ٤.٩
-                  </Badge>
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  {isNewUser ? (
+                    <Badge variant="default" className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/20">
+                      <Sparkles className="w-3 h-3 ml-1" />
+                      معلم جديد
+                    </Badge>
+                  ) : (
+                    <Badge variant="default" className="bg-green-500/10 text-green-600 hover:bg-green-500/20">
+                      <GraduationCap className="w-3 h-3 ml-1" />
+                      معلم معتمد
+                    </Badge>
+                  )}
+                  {!isNewUser && (
+                    <Badge variant="outline">
+                      <Star className="w-3 h-3 ml-1 text-yellow-500" />
+                      ٤.٩
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="mt-6 space-y-3">

@@ -9,7 +9,6 @@ export interface User {
   role: "TEACHER" | "STUDENT" | "PARENT" | "ADMIN";
   parentId?: string;
   students?: string[];
-  subscriptionStatus: boolean;
   createdAt: string;
   updatedAt: string;
 }
