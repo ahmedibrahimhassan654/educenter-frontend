@@ -3,7 +3,10 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
-import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
+import { AuthProvider } from "@/components/auth-provider";
+import { Toaster } from "sonner";
+import { JsonLd } from "@/components/json-ld";
+import { generateOrganizationSchema, generateWebsiteSchema, SITE_CONFIG } from "@/lib/seo";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -22,13 +25,52 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: {
-    default: APP_NAME,
-    template: `%s | ${APP_NAME}`,
+    default: SITE_CONFIG.name,
+    template: `%s | ${SITE_CONFIG.name}`,
   },
-  description: APP_DESCRIPTION,
-  keywords: ["education", "tutoring", "learning", "platform"],
-  authors: [{ name: APP_NAME }],
-  robots: "index, follow",
+  description: SITE_CONFIG.description,
+  keywords: SITE_CONFIG.keywords,
+  authors: [{ name: SITE_CONFIG.name }],
+  creator: SITE_CONFIG.name,
+  publisher: SITE_CONFIG.name,
+  metadataBase: new URL(SITE_CONFIG.url),
+  alternates: {
+    canonical: SITE_CONFIG.url,
+  },
+  openGraph: {
+    type: "website",
+    locale: "ar_EG",
+    url: SITE_CONFIG.url,
+    title: SITE_CONFIG.name,
+    description: SITE_CONFIG.description,
+    siteName: SITE_CONFIG.name,
+    images: [
+      {
+        url: SITE_CONFIG.ogImage,
+        width: 1200,
+        height: 630,
+        alt: SITE_CONFIG.name,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_CONFIG.name,
+    description: SITE_CONFIG.description,
+    images: [SITE_CONFIG.twitterImage],
+    creator: "@educenter",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export const viewport: Viewport = {
@@ -51,6 +93,9 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body
         className={cn(
@@ -59,13 +104,23 @@ export default function RootLayout({
           geistMono.variable
         )}
       >
+        <JsonLd data={generateOrganizationSchema()} />
+        <JsonLd data={generateWebsiteSchema()} />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <AuthProvider>
+            {children}
+            <Toaster
+              position="top-center"
+              richColors
+              closeButton
+              dir="rtl"
+            />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

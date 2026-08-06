@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   TrendingUp,
   CheckCircle,
-  MapPin,
   Video,
 } from "lucide-react";
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Metadata } from "next";
 import { DynamicThemeToggle } from "@/lib/dynamic-imports";
 import {
   BookOpen,
@@ -18,6 +19,15 @@ import {
   Rocket,
   Medal,
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "للطلاب - ابدأ رحلتك التعليمية",
+  description: "استكشف المجموعات الدراسية، سجّل في الدروس، وتتبع تقدمك التعليمي. تعليم متميز للمراحل الابتدائية والإعدادية والثانوية.",
+  keywords: ["طالب", "دراسة", "دروس", "مجموعات دراسية", "تعليم أونلاين"],
+  alternates: {
+    canonical: "/for-students",
+  },
+};
 
 const heroStats = [
   { value: "+٢٬٥٠٠", label: "طالب نشط" },

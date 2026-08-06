@@ -5,10 +5,7 @@ import {
   Wallet,
   TrendingUp,
   ArrowDownToLine,
-  Calendar,
-  Users,
   CheckCircle,
-  Clock,
   Download,
   CreditCard,
 } from "lucide-react";

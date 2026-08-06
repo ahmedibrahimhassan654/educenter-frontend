@@ -7,14 +7,10 @@ import {
   Users,
   Plus,
   Search,
-  Filter,
-  ArrowLeft,
   Clock,
   CheckCircle,
   MoreVertical,
   Calendar,
-  BookOpen,
-  GraduationCap,
   X,
 } from "lucide-react";
 

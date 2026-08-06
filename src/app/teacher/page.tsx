@@ -6,11 +6,9 @@ import {
   Users,
   Wallet,
   Calendar,
-  TrendingUp,
   ArrowLeft,
   Clock,
   CheckCircle,
-  AlertCircle,
   BookOpen,
 } from "lucide-react";
 

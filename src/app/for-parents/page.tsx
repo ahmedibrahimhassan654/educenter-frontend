@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Metadata } from "next";
 import { DynamicThemeToggle } from "@/lib/dynamic-imports";
 import {
   Eye,
@@ -17,6 +18,15 @@ import {
   Smartphone,
   Phone,
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "لأولياء الأمور - تابع تقدم طفلك",
+  description: "تابع حضور وأداء طفلك التعليمي. تقارير مفصلة، تواصل مع المعلمين، وإدارة المدفوعات بسهولة وأمان.",
+  keywords: ["ولي أمر", "متابعة الطلاب", "أداء الطلاب", "تواصل مع المعلمين"],
+  alternates: {
+    canonical: "/for-parents",
+  },
+};
 
 const heroStats = [
   { value: "+٢٬٥٠٠", label: "ولي أمر مسجل" },

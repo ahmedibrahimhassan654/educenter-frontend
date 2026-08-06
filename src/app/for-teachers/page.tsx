@@ -1,6 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Metadata } from "next";
 import { DynamicThemeToggle } from "@/lib/dynamic-imports";
+import { JsonLd } from "@/components/json-ld";
+import { generateBreadcrumbSchema } from "@/lib/seo";
 import {
   GraduationCap,
   Calendar,
@@ -14,6 +17,19 @@ import {
   TrendingUp,
   Bell,
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "للمعلمين - انضم إلى فريق المعلمين",
+  description: "انضم إلى أكثر من ١٥٠ معلم في إديو سنتر. إدارة ذكية للجداول، تقارير أداء مفصلة، نظام مالي متكامل. سجّل كمعلم الآن!",
+  keywords: ["معلم", "تدريس", "دروس خصوصية", "وظائف تعليمية", "التدريس أونلاين"],
+  alternates: {
+    canonical: "/for-teachers",
+  },
+  openGraph: {
+    title: "للمعلمين - انضم إلى فريق المعلمين | إديو سنتر",
+    description: "انضم إلى أكثر من ١٥٠ معلم في إديو سنتر. إدارة ذكية للجداول، تقارير أداء مفصلة، نظام مالي متكامل.",
+  },
+};
 
 const heroStats = [
   { value: "+١٥٠", label: "معلم نشط" },
@@ -163,10 +179,16 @@ export default function ForTeachersPage() {
           <div className="flex items-center gap-4">
             <DynamicThemeToggle />
             <Link
-              href="/register"
+              href="/login"
+              className="text-base font-medium hover:text-primary transition-colors"
+            >
+              تسجيل الدخول
+            </Link>
+            <Link
+              href="/register/teacher"
               className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-base font-medium hover:bg-primary/90 transition-colors"
             >
-              ابدأ الآن
+              سجّل كمعلم
             </Link>
           </div>
         </div>
@@ -198,7 +220,7 @@ export default function ForTeachersPage() {
 
             <div className="flex flex-col sm:flex-row gap-5 justify-center mb-20">
               <Link
-                href="/register"
+                href="/register/teacher"
                 className="inline-flex items-center justify-center gap-3 px-10 py-5 bg-primary text-primary-foreground rounded-xl text-xl font-medium hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/25"
               >
                 سجّل كمعلم الآن
@@ -438,7 +460,7 @@ export default function ForTeachersPage() {
                 انضم إلى أكثر من ١٥٠ معلم يثقون بمنصتنا لإدارة حصصهم وتنمية أعمالهم
               </p>
               <Link
-                href="/register"
+                href="/register/teacher"
                 className="inline-flex items-center justify-center gap-3 px-10 py-5 bg-white text-primary rounded-xl text-xl font-medium hover:bg-white/90 transition-colors"
               >
                 سجّل مجاناً

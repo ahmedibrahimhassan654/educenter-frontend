@@ -6,10 +6,8 @@ import DashboardLayout from "@/components/dashboard-layout";
 import {
   ArrowRight,
   CheckCircle,
-  XCircle,
   Clock,
   Save,
-  MessageSquare,
   BookOpen,
 } from "lucide-react";
 
@@ -45,7 +43,7 @@ type Status = "present" | "absent" | "excused";
 
 export default function AttendancePage() {
   const [attendance, setAttendance] = useState<Record<number, Status>>(
-    Object.fromEntries(students.map((s) => [s.id, s.status]))
+    Object.fromEntries(students.map((s) => [s.id, s.status as Status]))
   );
   const [homework, setHomework] = useState<Record<number, boolean>>(
     Object.fromEntries(students.map((s) => [s.id, s.homework]))

@@ -5,14 +5,12 @@ import DashboardLayout from "@/components/dashboard-layout";
 import {
   Search,
   Filter,
-  Users,
   Star,
   Clock,
   Calendar,
   ArrowLeft,
   BookOpen,
   GraduationCap,
-  MapPin,
 } from "lucide-react";
 
 const allGroups = [

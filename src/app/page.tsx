@@ -1,6 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Metadata } from "next";
 import { DynamicThemeToggle } from "@/lib/dynamic-imports";
+import UserMenu from "@/components/user-menu";
+import { JsonLd } from "@/components/json-ld";
+import { generateLocalBusinessSchema, generateFAQSchema } from "@/lib/seo";
 import {
   GraduationCap,
   Users,
@@ -18,6 +22,15 @@ import {
   Quote,
   TrendingUp,
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "إديو سنتر - منصة التعليم الرائدة في مصر",
+  description: "منصة إديو سنتر - أكبر منصة تعليمية في مصر. نوفر تعليم متميز للمراحل الابتدائية والإعدادية والثانوية مع أفضل المعلمين. سجّل الآن!",
+  keywords: ["تعليم مصر", "دروس خصوصية", "معلمين معتمدين", "ثانوية عامة", "إعدادي", "ابتدائي"],
+  alternates: {
+    canonical: "/",
+  },
+};
 
 const stats = [
   { icon: Users, value: "+٢٬٥٠٠", label: "طالب نشط" },
@@ -143,8 +156,30 @@ const testimonials = [
 ];
 
 export default function Home() {
+  const faqSchema = generateFAQSchema([
+    {
+      question: "كيف أسجل كمعلم في إديو سنتر؟",
+      answer: "يمكنك التسجيل كمعلم من خلال صفحة التسجيل الخاصة بالمعلمين. ستحتاج إلى إدخال بياناتك الشخصية والمؤهلات التعليمية.",
+    },
+    {
+      question: "ما هي المراحل الدراسية المتاحة؟",
+      answer: "نوفر تعليم للمراحل الابتدائية (الصف الأول حتى السادس)، والإعدادية (الصف الأول حتى الثالث)، والثانوية (الصف الأول حتى الثالث).",
+    },
+    {
+      question: "كيف يمكن لأولياء الأمور متابعة أبنائهم؟",
+      answer: "يمكن لأولياء الأمور إنشاء حساب وربطه بحساب الطالب باستخدام رمز الربط الخاص. ثم يمكنهم متابعة الحضور والأداء والتقدم التعليمي.",
+    },
+    {
+      question: "ما هي طرق الدفع المتاحة؟",
+      answer: "نقبل الدفع عبر فودافون كاش، والتحويل البنكي، وبطاقات الائتمان. جميع المدفوعات آمنة ومشفرة.",
+    },
+  ]);
+
   return (
     <div className="min-h-screen flex flex-col" dir="rtl">
+      <JsonLd data={generateLocalBusinessSchema()} />
+      <JsonLd data={faqSchema} />
+      
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur-md sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between">
@@ -165,18 +200,7 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-4">
             <DynamicThemeToggle />
-            <Link
-              href="/login"
-              className="text-base font-medium hover:text-primary transition-colors"
-            >
-              تسجيل الدخول
-            </Link>
-            <Link
-              href="/register"
-              className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-base font-medium hover:bg-primary/90 transition-colors"
-            >
-              ابدأ الآن
-            </Link>
+            <UserMenu />
           </div>
         </div>
       </header>
