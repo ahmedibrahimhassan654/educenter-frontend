@@ -29,14 +29,15 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refreshing the auth token
+  // Use getUser() only when necessary - it's more secure but slower
+  // For session refresh, use getSession() which is faster
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  // If user is not authenticated and trying to access protected routes
+  // If no session and trying to access protected routes, redirect to login
   if (
-    !user &&
+    !session &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/register") &&
     !request.nextUrl.pathname.startsWith("/") &&
