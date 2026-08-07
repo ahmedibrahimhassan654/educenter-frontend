@@ -44,6 +44,7 @@ interface User {
   role: "TEACHER" | "STUDENT" | "PARENT" | "ADMIN";
   subscriptionStatus: boolean;
   avatarUrl?: string;
+  verificationStatus?: "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
   createdAt: string;
   updatedAt: string;
 }
@@ -251,6 +252,16 @@ export default function AdminUsersPage() {
     }
   };
 
+  const getVerificationBadge = (status?: string) => {
+    const variants: Record<string, { bg: string; text: string; label: string; icon: React.ElementType }> = {
+      VERIFIED: { bg: "bg-green-500/10", text: "text-green-600", label: "محقق", icon: CheckCircle },
+      SUBMITTED: { bg: "bg-yellow-500/10", text: "text-yellow-600", label: "قيد المراجعة", icon: Clock },
+      REJECTED: { bg: "bg-red-500/10", text: "text-red-600", label: "مرفوض", icon: XCircle },
+      PENDING: { bg: "bg-gray-500/10", text: "text-gray-600", label: "في الانتظار", icon: Clock },
+    };
+    return variants[status || "PENDING"] || variants.PENDING;
+  };
+
   // Format date
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -391,6 +402,7 @@ export default function AdminUsersPage() {
                       <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground">المستخدم</th>
                       <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground hidden md:table-cell">الهاتف</th>
                       <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground">الدور</th>
+                      <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground hidden lg:table-cell">التحقق</th>
                       <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground hidden lg:table-cell">تاريخ التسجيل</th>
                       <th className="text-center py-4 px-6 text-sm font-medium text-muted-foreground">إجراءات</th>
                     </tr>
@@ -398,6 +410,8 @@ export default function AdminUsersPage() {
                   <tbody>
                     {users.map((user) => {
                       const roleBadge = getRoleBadge(user.role);
+                      const verificationBadge = getVerificationBadge(user.verificationStatus);
+                      const VerificationIcon = verificationBadge.icon;
                       return (
                         <tr key={user._id} className="border-t hover:bg-muted/30 transition-colors">
                           <td className="py-4 px-6">
@@ -431,6 +445,18 @@ export default function AdminUsersPage() {
                                 {roleBadge.label}
                               </span>
                             </Badge>
+                          </td>
+                          <td className="py-4 px-6 hidden lg:table-cell">
+                            {user.role === "TEACHER" ? (
+                              <Badge variant="outline" className={`${verificationBadge.bg} ${verificationBadge.text} border-0`}>
+                                <span className="flex items-center gap-1">
+                                  <VerificationIcon className="w-3 h-3" />
+                                  {verificationBadge.label}
+                                </span>
+                              </Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="py-4 px-6 hidden lg:table-cell">
                             <span className="text-sm text-muted-foreground">
@@ -761,6 +787,27 @@ export default function AdminUsersPage() {
                           : (showViewModal.role === "TEACHER" ? "معلم نشط" : "طالب نشط")
                         }
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {showViewModal.role === "TEACHER" && (
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground">حالة التحقق</p>
+                      <Badge variant="outline" className={`${getVerificationBadge(showViewModal.verificationStatus).bg} ${getVerificationBadge(showViewModal.verificationStatus).text} border-0 mt-1`}>
+                        <span className="flex items-center gap-1">
+                          {(() => {
+                            const badge = getVerificationBadge(showViewModal.verificationStatus);
+                            const Icon = badge.icon;
+                            return <Icon className="w-3 h-3" />;
+                          })()}
+                          {getVerificationBadge(showViewModal.verificationStatus).label}
+                        </span>
+                      </Badge>
                     </div>
                   </div>
                 )}

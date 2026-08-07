@@ -112,13 +112,31 @@ export default function TeacherVerificationPage() {
     }
   }, [verificationStatus, router]);
 
-  const handleCurriculumToggle = (curriculumName: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectedCurriculum: prev.selectedCurriculum.includes(curriculumName)
-        ? prev.selectedCurriculum.filter((c) => c !== curriculumName)
-        : [...prev.selectedCurriculum, curriculumName],
-    }));
+  const handleCurriculumToggle = (uniqueKey: string, subjectName: string) => {
+    setFormData((prev) => {
+      // Check if this specific subject (with stage/grade context) is already selected
+      const isSelected = prev.selectedCurriculum.some((c) => c.startsWith(uniqueKey + ":"));
+      
+      if (isSelected) {
+        // Remove only this specific subject
+        return {
+          ...prev,
+          selectedCurriculum: prev.selectedCurriculum.filter((c) => !c.startsWith(uniqueKey + ":")),
+        };
+      } else {
+        // Add with unique key to distinguish same subject in different stages
+        return {
+          ...prev,
+          selectedCurriculum: [...prev.selectedCurriculum, `${uniqueKey}:${subjectName}`],
+        };
+      }
+    });
+  };
+
+  // Helper to get display name from curriculum entry
+  const getDisplayName = (entry: string) => {
+    const parts = entry.split(":");
+    return parts.length > 1 ? parts[1] : entry;
   };
 
   const handleFileUpload = async (docType: string, file: File) => {
@@ -226,9 +244,12 @@ export default function TeacherVerificationPage() {
     try {
       const documentUrls = Object.values(documents).map((doc) => doc.url);
       
+      // Extract subject names from the unique keys for backend storage
+      const curriculumNames = formData.selectedCurriculum.map(getDisplayName);
+      
       await api.post("/verification/submit", {
         experience: formData.experience,
-        curriculum: formData.selectedCurriculum,
+        curriculum: curriculumNames,
         bio: formData.bio,
         documents: documentUrls,
       });
@@ -246,26 +267,156 @@ export default function TeacherVerificationPage() {
   // Show status if already submitted
   if (verificationStatus === "SUBMITTED") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-card border rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full bg-yellow-500/10 flex items-center justify-center mb-6">
-            <Clock className="w-8 h-8 text-yellow-500" />
-          </div>
-          <h1 className="text-2xl font-bold mb-3">طلبك قيد المراجعة</h1>
-          <p className="text-muted-foreground mb-6">
-            تم إرسال طلب التحقق الخاص بك بنجاح. سيقوم المدير بمراجعة طلبك والتواصل معك قريباً.
-          </p>
-          <div className="bg-muted/50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-muted-foreground">
-              سيتم إعلامك عبر البريد الإلكتروني عند الموافقة على طلبك أو رفضه.
+      <div className="min-h-screen bg-muted/30 py-12 px-4">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 mx-auto rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+              <Clock className="w-8 h-8 text-blue-500" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">طلبك قيد المراجعة</h1>
+            <p className="text-muted-foreground">
+              تم إرسال طلب التحقق الخاص بك بنجاح. سيقوم المدير بمراجعة طلبك والتواصل معك قريباً.
             </p>
           </div>
-          <button
-            onClick={() => router.push("/login")}
-            className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
-          >
-            العودة لتسجيل الدخول
-          </button>
+
+          {/* Status Badge */}
+          <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4 mb-8">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div>
+                <p className="font-semibold text-blue-800 dark:text-blue-300">قيد المراجعة</p>
+                <p className="text-sm text-blue-700 dark:text-blue-400">لا يمكن تعديل البيانات أثناء المراجعة</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Submitted Information - Read Only */}
+          <div className="space-y-6">
+            {/* Experience */}
+            <div className="bg-card border rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">الخبرة التعليمية</h2>
+                </div>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-4 min-h-[120px]">
+                <p className="text-base text-foreground whitespace-pre-wrap">{formData.experience || "غير محدد"}</p>
+              </div>
+            </div>
+
+            {/* Curriculum */}
+            <div className="bg-card border rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <BookOpen className="w-5 h-5 text-green-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">المنهج الدراسي المحدد</h2>
+                </div>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-4">
+                {formData.selectedCurriculum.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.selectedCurriculum.map((subject, index) => (
+                      <span key={index} className="px-3 py-1.5 bg-primary/10 text-primary text-sm font-medium rounded-lg">
+                        {getDisplayName(subject)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">لم يتم تحديد منهج</p>
+                )}
+              </div>
+            </div>
+
+            {/* Documents */}
+            <div className="bg-card border rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">المستندات المرفقة</h2>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {documentTypes.map((docType) => {
+                  const uploadedDoc = documents[docType.id];
+                  return (
+                    <div key={docType.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="font-medium">
+                            {docType.label}
+                            {docType.required && <span className="text-red-500 mr-1">*</span>}
+                          </p>
+                        </div>
+                      </div>
+                      {uploadedDoc ? (
+                        <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-lg">
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-green-800 dark:text-green-300 truncate">
+                              {uploadedDoc.name}
+                            </p>
+                            <a
+                              href={uploadedDoc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-green-600 dark:text-green-400 hover:underline"
+                            >
+                              عرض الملف
+                            </a>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg">
+                          <p className="text-sm text-red-700 dark:text-red-400">لم يتم رفع هذا المستند</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bio */}
+            {formData.bio && (
+              <div className="bg-card border rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <GraduationCap className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">نبذة عنك</h2>
+                  </div>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 min-h-[100px]">
+                  <p className="text-base text-foreground whitespace-pre-wrap">{formData.bio}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="space-y-3 pt-4 border-t">
+              <button
+                onClick={() => router.push("/teacher")}
+                className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              >
+                الذهاب للوحة التحكم
+              </button>
+              <button
+                onClick={() => router.push("/teacher/profile")}
+                className="w-full py-3 border rounded-lg font-medium hover:bg-muted transition-colors"
+              >
+                الملف الشخصي
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -288,15 +439,23 @@ export default function TeacherVerificationPage() {
               <p className="text-sm text-red-700 dark:text-red-400">{user.verificationNotes}</p>
             </div>
           )}
-          <button
-            onClick={() => {
-              refreshUser();
-              window.location.reload();
-            }}
-            className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
-          >
-            إعادة تقديم الطلب
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                refreshUser();
+                window.location.reload();
+              }}
+              className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            >
+              إعادة تقديم الطلب
+            </button>
+            <button
+              onClick={() => router.push("/teacher")}
+              className="w-full py-3 border rounded-lg font-medium hover:bg-muted transition-colors"
+            >
+              الذهاب للوحة التحكم
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -367,12 +526,13 @@ export default function TeacherVerificationPage() {
                           <p className="text-sm text-muted-foreground mb-2">{grade.name}</p>
                           <div className="flex flex-wrap gap-2">
                             {grade.subjects.map((subject) => {
-                              const isSelected = formData.selectedCurriculum.includes(subject.name);
+                              const uniqueKey = `${stage.name}-${grade.name}-${subject.code}`;
+                              const isSelected = formData.selectedCurriculum.some((c) => c.startsWith(uniqueKey + ":"));
                               return (
                                 <button
-                                  key={subject.code}
+                                  key={uniqueKey}
                                   type="button"
-                                  onClick={() => handleCurriculumToggle(subject.name)}
+                                  onClick={() => handleCurriculumToggle(uniqueKey, subject.name)}
                                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                                     isSelected
                                       ? "bg-primary text-primary-foreground"
@@ -395,7 +555,7 @@ export default function TeacherVerificationPage() {
             {formData.selectedCurriculum.length > 0 && (
               <div className="mt-4 p-3 bg-primary/10 rounded-lg">
                 <p className="text-sm font-medium text-primary">
-                  المختارة: {formData.selectedCurriculum.join("، ")}
+                  المختارة: {formData.selectedCurriculum.map(getDisplayName).join("، ")}
                 </p>
               </div>
             )}

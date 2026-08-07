@@ -22,6 +22,8 @@ import {
   UserCircle,
   School,
   Shield,
+  Clock,
+  XCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -107,20 +109,30 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Check if teacher is unverified
-  const isUnverifiedTeacher = role === "teacher" && 
+  // Check if teacher needs to complete verification
+  const isPendingTeacher = role === "teacher" && 
     user?.role === "TEACHER" && 
-    user?.verificationStatus !== "VERIFIED";
+    user?.verificationStatus === "PENDING";
 
-  // Redirect unverified teachers to verification page
+  // Check if teacher is awaiting verification
+  const isSubmittedTeacher = role === "teacher" && 
+    user?.role === "TEACHER" && 
+    user?.verificationStatus === "SUBMITTED";
+
+  // Check if teacher is rejected
+  const isRejectedTeacher = role === "teacher" && 
+    user?.role === "TEACHER" && 
+    user?.verificationStatus === "REJECTED";
+
+  // Redirect all non-VERIFIED teachers to verification page
+  const isRestrictedTeacher = isPendingTeacher || isSubmittedTeacher || isRejectedTeacher;
+
   useEffect(() => {
-    if (isUnverifiedTeacher && pathname !== "/teacher/verification" && pathname !== "/teacher/profile") {
+    if (isRestrictedTeacher && pathname !== "/teacher/verification" && pathname !== "/teacher/profile") {
       router.push("/teacher/verification");
     }
-  }, [isUnverifiedTeacher, pathname, router]);
-
-  // Get appropriate links based on verification status
-  const links = isUnverifiedTeacher ? unverifiedTeacherLinks : roleLinks[role];
+  }, [isRestrictedTeacher, pathname, router]);
+  const links = isRestrictedTeacher ? unverifiedTeacherLinks : roleLinks[role];
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -172,8 +184,8 @@ export default function DashboardLayout({
             </Link>
           </div>
 
-          {/* Verification Warning for Unverified Teachers */}
-          {isUnverifiedTeacher && (
+          {/* Verification Warning for Teachers */}
+          {isPendingTeacher && (
             <div className="p-4 mx-4 mt-4 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-lg">
               <div className="flex items-start gap-2">
                 <Shield className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
@@ -184,6 +196,50 @@ export default function DashboardLayout({
                   <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
                     يرجى إكمال عملية التحقق للوصول لجميع الميزات
                   </p>
+                  <Link
+                    href="/teacher/verification"
+                    className="text-xs text-yellow-800 dark:text-yellow-300 font-medium hover:underline mt-2 inline-block"
+                  >
+                    إكمال التحقق ←
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isSubmittedTeacher && (
+            <div className="p-4 mx-4 mt-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-blue-800 dark:text-blue-300">
+                    طلبك قيد المراجعة
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                    يمكنك الوصول للوحة التحكم بميزات محدودة حتى يتم الموافقة على طلبك
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isRejectedTeacher && (
+            <div className="p-4 mx-4 mt-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <XCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-red-800 dark:text-red-300">
+                    تم رفض طلب التحقق
+                  </p>
+                  <p className="text-xs text-red-700 dark:text-red-400 mt-1">
+                    يرجى مراجعة سبب الرفض وإعادة تقديم الطلب
+                  </p>
+                  <Link
+                    href="/teacher/verification"
+                    className="text-xs text-red-800 dark:text-red-300 font-medium hover:underline mt-2 inline-block"
+                  >
+                    مراجعة الطلب ←
+                  </Link>
                 </div>
               </div>
             </div>

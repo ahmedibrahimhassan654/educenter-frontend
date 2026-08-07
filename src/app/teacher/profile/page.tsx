@@ -40,6 +40,7 @@ import {
   FileText,
   Sparkles,
   Loader2,
+  Shield,
 } from "lucide-react";
 
 export default function TeacherProfilePage() {

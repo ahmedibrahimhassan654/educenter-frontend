@@ -149,7 +149,7 @@ export function clearCache(pattern?: string) {
     return;
   }
   
-  for (const key of responseCache.keys()) {
+  for (const key of Array.from(responseCache.keys())) {
     if (key.includes(pattern)) {
       responseCache.delete(key);
     }

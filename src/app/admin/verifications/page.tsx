@@ -54,6 +54,9 @@ export default function AdminVerificationsPage() {
   const [showModal, setShowModal] = useState(false);
   const [actionNotes, setActionNotes] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsLoaded, setDocsLoaded] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   const fetchTeachers = async () => {
     try {
@@ -115,6 +118,40 @@ export default function AdminVerificationsPage() {
     setSelectedTeacher(teacher);
     setActionNotes("");
     setShowModal(true);
+    setDocsLoaded(false);
+    setImageErrors({});
+
+    // Preload document images
+    const docs = teacher.verificationData?.documents;
+    if (docs && docs.length > 0) {
+      const imageDocs = docs.filter((url) => url.match(/\.(jpg|jpeg|png|webp)$/i) || url.startsWith("data:image"));
+      if (imageDocs.length > 0) {
+        setDocsLoading(true);
+        let loaded = 0;
+        imageDocs.forEach((url) => {
+          const img = new window.Image();
+          img.onload = () => {
+            loaded++;
+            if (loaded === imageDocs.length) {
+              setDocsLoading(false);
+              setDocsLoaded(true);
+            }
+          };
+          img.onerror = () => {
+            loaded++;
+            if (loaded === imageDocs.length) {
+              setDocsLoading(false);
+              setDocsLoaded(true);
+            }
+          };
+          img.src = url;
+        });
+      } else {
+        setDocsLoaded(true);
+      }
+    } else {
+      setDocsLoaded(true);
+    }
   };
 
   const filters = [
@@ -347,46 +384,63 @@ export default function AdminVerificationsPage() {
                         <File className="w-4 h-4" />
                         المستندات المرفقة
                       </h4>
-                      <div className="space-y-2">
-                        {selectedTeacher.verificationData.documents.map((docUrl, index) => {
-                          const docLabels = ["البطاقة الشخصية", "شهادة التخرج", "شهادة إضافية"];
-                          const label = docLabels[index] || `مستند ${index + 1}`;
-                          const isImage = docUrl.match(/\.(jpg|jpeg|png|webp)$/i) || docUrl.startsWith("data:image");
-                          
-                          return (
-                            <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                              {isImage ? (
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium mb-2">{label}</p>
-                                  <a href={docUrl} target="_blank" rel="noopener noreferrer">
-                                    <img
-                                      src={docUrl}
-                                      alt={label}
-                                      className="max-w-full h-auto max-h-48 rounded-lg border"
-                                    />
-                                  </a>
-                                </div>
-                              ) : (
-                                <>
-                                  <FileText className="w-5 h-5 text-blue-500" />
+                      {docsLoading ? (
+                        <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span className="text-sm">جاري تحميل المستندات...</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {selectedTeacher.verificationData.documents.map((docUrl, index) => {
+                            const docLabels = ["البطاقة الشخصية", "شهادة التخرج", "شهادة إضافية"];
+                            const label = docLabels[index] || `مستند ${index + 1}`;
+                            const isImage = docUrl.match(/\.(jpg|jpeg|png|webp)$/i) || docUrl.startsWith("data:image");
+                            
+                            return (
+                              <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                                {isImage ? (
                                   <div className="flex-1">
-                                    <p className="text-sm font-medium">{label}</p>
-                                    <a
-                                      href={docUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
-                                    >
-                                      <Download className="w-3 h-3" />
-                                      عرض / تحميل
-                                    </a>
+                                    <p className="text-sm font-medium mb-2">{label}</p>
+                                    {imageErrors[index] ? (
+                                      <div className="flex items-center gap-2 text-sm text-destructive py-2">
+                                        <XCircle className="w-4 h-4" />
+                                        <span>فشل تحميل الصورة</span>
+                                      </div>
+                                    ) : (
+                                      <a href={docUrl} target="_blank" rel="noopener noreferrer">
+                                        <img
+                                          src={docUrl}
+                                          alt={label}
+                                          className="max-w-full h-auto max-h-48 rounded-lg border"
+                                          onError={(e) => {
+                                            setImageErrors((prev) => ({ ...prev, [index]: true }));
+                                          }}
+                                        />
+                                      </a>
+                                    )}
                                   </div>
-                                </>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                                ) : (
+                                  <>
+                                    <FileText className="w-5 h-5 text-blue-500" />
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium">{label}</p>
+                                      <a
+                                        href={docUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                        عرض / تحميل
+                                      </a>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

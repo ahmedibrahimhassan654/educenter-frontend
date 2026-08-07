@@ -14,6 +14,9 @@ import {
   CheckCircle,
   BookOpen,
   Loader2,
+  Shield,
+  XCircle,
+  AlertCircle,
 } from "lucide-react";
 
 interface Group {
@@ -79,6 +82,41 @@ export default function TeacherDashboard() {
   return (
     <DashboardLayout role="teacher">
       <div className="space-y-8">
+        {/* Verification Status Banner */}
+        {user?.verificationStatus === "SUBMITTED" && (
+          <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-blue-800 dark:text-blue-300">طلبك قيد المراجعة</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
+                  تم إرسال طلب التحقق الخاص بك. يمكنك الوصول للوحة التحكم بميزات محدودة حتى يتم الموافقة على طلبك.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {user?.verificationStatus === "REJECTED" && (
+          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-800 dark:text-red-300">تم رفض طلب التحقق</h3>
+                <p className="text-sm text-red-700 dark:text-red-400 mt-1">
+                  {user?.verificationNotes || "تم رفض طلبك. يرجى مراجعة سبب الرفض وإعادة تقديم الطلب."}
+                </p>
+                <Link
+                  href="/teacher/verification"
+                  className="text-sm text-red-800 dark:text-red-300 font-medium hover:underline mt-2 inline-block"
+                >
+                  إعادة تقديم الطلب ←
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Welcome Section */}
         <div className="bg-gradient-to-br from-primary/10 to-secondary/10 rounded-2xl p-8">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
