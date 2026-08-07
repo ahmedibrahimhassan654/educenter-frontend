@@ -65,7 +65,13 @@ export default function LoginPage() {
         try {
           const response = await api.get("/auth/me");
           const userRole = response.data?.role || "STUDENT";
-          const redirectPath = roleRedirects[userRole] || "/";
+          const verificationStatus = response.data?.verificationStatus;
+          
+          // Redirect unverified teachers to verification page
+          let redirectPath = roleRedirects[userRole] || "/";
+          if (userRole === "TEACHER" && verificationStatus !== "VERIFIED") {
+            redirectPath = "/teacher/verification";
+          }
 
           toast.success("تم تسجيل الدخول بنجاح", {
             description: `مرحباً بعودتك!`,

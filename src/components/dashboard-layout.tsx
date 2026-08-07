@@ -21,8 +21,9 @@ import {
   BookOpen,
   UserCircle,
   School,
+  Shield,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { NotificationBell } from "@/components/notification-bell";
 
@@ -37,6 +38,12 @@ const teacherLinks: SidebarLink[] = [
   { href: "/teacher/groups", label: "المجموعات", icon: Users },
   { href: "/teacher/earnings", label: "الأرباح", icon: Wallet },
   { href: "/notifications", label: "الإشعارات", icon: Bell },
+  { href: "/teacher/profile", label: "الملف الشخصي", icon: UserCircle },
+];
+
+// Limited links for unverified teachers
+const unverifiedTeacherLinks: SidebarLink[] = [
+  { href: "/teacher/verification", label: "تحقق من الحساب", icon: Shield },
   { href: "/teacher/profile", label: "الملف الشخصي", icon: UserCircle },
 ];
 
@@ -57,6 +64,7 @@ const parentLinks: SidebarLink[] = [
 const adminLinks: SidebarLink[] = [
   { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/admin/users", label: "المستخدمين", icon: Users },
+  { href: "/admin/verifications", label: "طلبات التحقق", icon: Shield },
   { href: "/admin/groups", label: "المجموعات", icon: BookOpen },
   { href: "/admin/curriculum", label: "المنهاج الدراسي", icon: School },
   { href: "/admin/payments", label: "المدفوعات", icon: Wallet },
@@ -98,7 +106,21 @@ export default function DashboardLayout({
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const links = roleLinks[role];
+
+  // Check if teacher is unverified
+  const isUnverifiedTeacher = role === "teacher" && 
+    user?.role === "TEACHER" && 
+    user?.verificationStatus !== "VERIFIED";
+
+  // Redirect unverified teachers to verification page
+  useEffect(() => {
+    if (isUnverifiedTeacher && pathname !== "/teacher/verification" && pathname !== "/teacher/profile") {
+      router.push("/teacher/verification");
+    }
+  }, [isUnverifiedTeacher, pathname, router]);
+
+  // Get appropriate links based on verification status
+  const links = isUnverifiedTeacher ? unverifiedTeacherLinks : roleLinks[role];
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -149,6 +171,23 @@ export default function DashboardLayout({
               </div>
             </Link>
           </div>
+
+          {/* Verification Warning for Unverified Teachers */}
+          {isUnverifiedTeacher && (
+            <div className="p-4 mx-4 mt-4 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Shield className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">
+                    حسابك غير محقق
+                  </p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
+                    يرجى إكمال عملية التحقق للوصول لجميع الميزات
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">

@@ -1,3 +1,12 @@
+export interface VerificationData {
+  experience?: string;
+  curriculum?: string[];
+  bio?: string;
+  documents?: string[];
+}
+
+export type VerificationStatus = "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
+
 export interface User {
   id: string;
   _id?: string;
@@ -9,6 +18,11 @@ export interface User {
   role: "TEACHER" | "STUDENT" | "PARENT" | "ADMIN";
   parentId?: string;
   students?: string[];
+  // Verification fields (for teachers)
+  verificationStatus?: VerificationStatus;
+  verificationData?: VerificationData;
+  verificationNotes?: string;
+  verifiedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
