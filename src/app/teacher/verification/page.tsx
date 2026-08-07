@@ -178,23 +178,12 @@ export default function TeacherVerificationPage() {
           upsert: false,
         });
 
-      if (uploadError && uploadError.message?.includes("Bucket not found")) {
-        // Fallback: convert to base64
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = reader.result as string;
-          setDocuments((prev) => ({
-            ...prev,
-            [docType]: {
-              url: dataUrl,
-              name: file.name,
-              type: file.type,
-            },
-          }));
-          toast.success("تم رفع الملف بنجاح");
-          setUploading((prev) => ({ ...prev, [docType]: false }));
-        };
-        reader.readAsDataURL(file);
+      // Never fall back to embedding base64 in the database: that silently
+      // stored hundreds of KB per document and made every authenticated
+      // request slow. Fail loudly instead so the bucket gets fixed.
+      if (uploadError?.message?.includes("Bucket not found")) {
+        console.error('Supabase Storage bucket "documents" is missing');
+        toast.error("تعذر رفع الملف: مساحة التخزين غير مهيأة. تواصل مع الدعم.");
         return;
       }
 

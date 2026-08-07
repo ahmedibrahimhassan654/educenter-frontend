@@ -116,10 +116,10 @@ export default function TeacherRegisterPage() {
       if (data.user) {
         // Create user profile in MongoDB
         try {
+          // Email is resolved server-side from Supabase, not sent by the client
           await api.post("/auth/register", {
             supabaseId: data.user.id,
             name: formData.name,
-            email: formData.email,
             phone: formData.phone,
             role: "TEACHER",
           });

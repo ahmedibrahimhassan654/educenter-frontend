@@ -17,8 +17,10 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  // Add timeout to prevent hanging requests
-  timeout: 10000,
+  // Add timeout to prevent hanging requests.
+  // Generous enough for verification documents, which are stored as base64
+  // data URIs and can be several hundred KB each.
+  timeout: 60000,
 });
 
 // Cache the session to avoid repeated calls
@@ -154,9 +156,20 @@ export function clearAuthCache() {
   responseCache.clear();
 }
 
-// Keep caches in sync with the Supabase auth lifecycle
+/**
+ * Prime the session cache from a session the caller already holds, avoiding a
+ * getSession() call that could contend with supabase-js's auth lock.
+ */
+export function setCachedSession(session: Session) {
+  cachedSession = session;
+  sessionExpiry = Date.now() + 5 * 60 * 1000;
+}
+
+// Keep caches in sync with the Supabase auth lifecycle.
+// This callback stays synchronous and never calls back into supabase-js:
+// doing so would deadlock the client's auth lock.
 if (typeof window !== "undefined") {
-  getSupabaseClient().auth.onAuthStateChange((event) => {
+  getSupabaseClient().auth.onAuthStateChange((event, session) => {
     if (
       event === "SIGNED_IN" ||
       event === "SIGNED_OUT" ||
@@ -164,6 +177,13 @@ if (typeof window !== "undefined") {
       event === "USER_UPDATED"
     ) {
       clearAuthCache();
+
+      // Seed the cache straight from the event so the next request does not
+      // need to call getSession() while the lock may still be held
+      if (session) {
+        cachedSession = session;
+        sessionExpiry = Date.now() + 5 * 60 * 1000;
+      }
     }
   });
 }

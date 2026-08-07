@@ -30,52 +30,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(cachedUser);
   const [isLoading, setIsLoading] = useState(!cachedUser);
 
-  const fetchUser = useCallback(async (forceRefresh = false) => {
-    // Use cache if available and not forcing refresh
-    if (!forceRefresh && cachedUser && Date.now() < userCacheExpiry) {
-      setUser(cachedUser);
-      setIsLoading(false);
-      return;
-    }
+  /**
+   * Load the profile for an already-authenticated user.
+   *
+   * `skipAuthCheck` is used when the caller already knows a session exists
+   * (e.g. from an onAuthStateChange payload) so we avoid calling back into
+   * supabase-js, which would deadlock inside its auth lock.
+   */
+  const fetchUser = useCallback(
+    async (forceRefresh = false, skipAuthCheck = false) => {
+      // Use cache if available and not forcing refresh
+      if (!forceRefresh && cachedUser && Date.now() < userCacheExpiry) {
+        setUser(cachedUser);
+        setIsLoading(false);
+        return;
+      }
 
-    try {
-      const supabase = createClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      try {
+        let hasSession = skipAuthCheck;
 
-      if (authUser) {
-        try {
-          const response = await api.get("/auth/me");
-          const userData = response.data;
-          
-          // Update cache
-          cachedUser = userData;
-          userCacheExpiry = Date.now() + USER_CACHE_DURATION;
-          
-          setUser(userData);
-        } catch {
+        if (!skipAuthCheck) {
+          const supabase = createClient();
+          const {
+            data: { user: authUser },
+          } = await supabase.auth.getUser();
+          hasSession = !!authUser;
+        }
+
+        if (hasSession) {
+          try {
+            const response = await api.get("/auth/me");
+            const userData = response.data;
+
+            // Update cache
+            cachedUser = userData;
+            userCacheExpiry = Date.now() + USER_CACHE_DURATION;
+
+            setUser(userData);
+          } catch {
+            setUser(null);
+            cachedUser = null;
+          }
+        } else {
           setUser(null);
           cachedUser = null;
         }
-      } else {
+      } catch {
         setUser(null);
         cachedUser = null;
+      } finally {
+        setIsLoading(false);
       }
-    } catch {
-      setUser(null);
-      cachedUser = null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     fetchUser();
 
     const supabase = createClient();
+    // The callback must stay synchronous: supabase-js invokes it while holding
+    // its auth lock, so awaiting another auth call here deadlocks the client
+    // and every subsequent request silently hangs.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event) => {
+      (event, session) => {
         if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-          await fetchUser(true); // Force refresh on sign in
+          // Defer past the lock, and trust the session from the event payload
+          setTimeout(() => {
+            void fetchUser(true, !!session);
+          }, 0);
         } else if (event === "SIGNED_OUT") {
           setUser(null);
           cachedUser = null;

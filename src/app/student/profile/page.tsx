@@ -43,6 +43,7 @@ export default function StudentProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"personal" | "security" | "notifications">("personal");
@@ -105,18 +106,11 @@ export default function StudentProfilePage() {
           upsert: false,
         });
 
-      if (uploadError && uploadError.message?.includes("Bucket not found")) {
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const dataUrl = reader.result as string;
-          await api.put(`/users/${userId}`, { avatarUrl: dataUrl });
-          setAvatarUrl(dataUrl);
-          await refreshUser();
-          toast.success("تم تحديث الصورة الشخصية بنجاح");
-          setIsUploading(false);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        };
-        reader.readAsDataURL(file);
+      // Never fall back to storing base64 in the database: it bloats every
+      // record and slows down all authenticated requests.
+      if (uploadError?.message?.includes("Bucket not found")) {
+        console.error('Supabase Storage bucket "avatars" is missing');
+        toast.error("تعذر رفع الصورة: مساحة التخزين غير مهيأة. تواصل مع الدعم.");
         return;
       }
 
@@ -179,8 +173,20 @@ export default function StudentProfilePage() {
       toast.error("كلمة المرور يجب أن تكون ٦ أحرف على الأقل");
       return;
     }
-    toast.success("تم تحديث كلمة المرور بنجاح");
-    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+    setIsChangingPassword(true);
+    try {
+      await api.post("/auth/change-password", {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+      toast.success("تم تحديث كلمة المرور بنجاح");
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "تعذر تحديث كلمة المرور");
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -592,9 +598,17 @@ export default function StudentProfilePage() {
                         </div>
                       </div>
 
-                      <Button onClick={handleChangePassword} className="w-full h-10 gap-2 bg-cyan-600 hover:bg-cyan-700">
-                        <Lock className="w-4 h-4" />
-                        تحديث كلمة المرور
+                      <Button
+                        onClick={handleChangePassword}
+                        disabled={isChangingPassword}
+                        className="w-full h-10 gap-2 bg-cyan-600 hover:bg-cyan-700"
+                      >
+                        {isChangingPassword ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Lock className="w-4 h-4" />
+                        )}
+                        {isChangingPassword ? "جاري التحديث..." : "تحديث كلمة المرور"}
                       </Button>
                     </div>
                   </div>

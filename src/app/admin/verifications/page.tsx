@@ -113,15 +113,34 @@ export default function AdminVerificationsPage() {
     }
   };
 
-  const openModal = (teacher: TeacherVerification) => {
+  const openModal = async (teacher: TeacherVerification) => {
     setSelectedTeacher(teacher);
     setActionNotes("");
     setShowModal(true);
     setDocsLoaded(false);
     setImageErrors({});
 
+    // The list response omits the (large) documents, so load them on demand
+    let docs = teacher.verificationData?.documents;
+    if (!docs) {
+      setDocsLoading(true);
+      try {
+        const response = await api.get(`/verification/${teacher._id}/documents`);
+        docs = response.data?.data?.documents || [];
+        const loadedTeacher = {
+          ...teacher,
+          verificationData: { ...teacher.verificationData, documents: docs },
+        };
+        setSelectedTeacher(loadedTeacher);
+      } catch {
+        toast.error("تعذر تحميل المستندات");
+        docs = [];
+      } finally {
+        setDocsLoading(false);
+      }
+    }
+
     // Preload document images
-    const docs = teacher.verificationData?.documents;
     if (docs && docs.length > 0) {
       const imageDocs = docs.filter((url) => url.match(/\.(jpg|jpeg|png|webp)$/i) || url.startsWith("data:image"));
       if (imageDocs.length > 0) {

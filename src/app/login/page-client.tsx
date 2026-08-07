@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import api, { clearAuthCache } from "@/lib/api";
+import api, { clearAuthCache, setCachedSession } from "@/lib/api";
 
 const features = [
   { icon: GraduationCap, text: "أفضل المعلمين المعتمدين" },
@@ -61,8 +61,12 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        // Drop any cached session/response from a previous identity
+        // Drop any cached session/response from a previous identity, then seed
+        // the session we just received so the next call needs no auth round-trip
         clearAuthCache();
+        if (data.session) {
+          setCachedSession(data.session);
+        }
 
         // Fetch user profile from MongoDB to get role
         try {
