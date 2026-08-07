@@ -1,7 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/dashboard-layout";
+import { useAuth } from "@/components/auth-provider";
+import api from "@/lib/api";
 import {
   Users,
   Wallet,
@@ -10,120 +13,79 @@ import {
   Clock,
   CheckCircle,
   BookOpen,
+  Loader2,
 } from "lucide-react";
 
-const stats = [
-  {
-    title: "إجمالي المجموعات",
-    value: "٤",
-    change: "+١ هذا الشهر",
-    icon: Users,
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
-  },
-  {
-    title: "إجمالي الطلاب",
-    value: "٧٢",
-    change: "+٨ طلاب جدد",
-    icon: BookOpen,
-    color: "text-green-500",
-    bg: "bg-green-500/10",
-  },
-  {
-    title: "صافي الأرباح",
-    value: "٢٧٬٢٠٠ ج.م",
-    change: "+١٥٪ عن الشهر الماضي",
-    icon: Wallet,
-    color: "text-purple-500",
-    bg: "bg-purple-500/10",
-  },
-  {
-    title: "الحصص هذا الشهر",
-    value: "١٦",
-    change: "٤ حصص متبقية",
-    icon: Calendar,
-    color: "text-orange-500",
-    bg: "bg-orange-500/10",
-  },
-];
+interface Group {
+  _id: string;
+  title: string;
+  subject: string;
+  grade: string;
+  students: any[];
+  totalSessionPrice?: number;
+}
 
-const upcomingSessions = [
-  {
-    id: 1,
-    group: "الفيزياء - الصف الثاني الثانوي",
-    time: "٩:٠٠ صباحاً",
-    date: "غداً الأحد",
-    students: 18,
-    maxStudents: 20,
-  },
-  {
-    id: 2,
-    group: "الرياضيات - الصف الأول الثانوي",
-    time: "١١:٠٠ صباحاً",
-    date: "غداً الأحد",
-    students: 20,
-    maxStudents: 20,
-  },
-  {
-    id: 3,
-    group: "الكيمياء - الصف الثالث الثانوي",
-    time: "٢:٠٠ مساءً",
-    date: "الأربعاء",
-    students: 15,
-    maxStudents: 20,
-  },
-];
-
-const recentGroups = [
-  {
-    id: 1,
-    name: "الفيزياء - الصف الثاني الثانوي",
-    students: 18,
-    maxStudents: 20,
-    sessions: 6,
-    totalSessions: 8,
-    earnings: "٦٬٨٠٠ ج.م",
-  },
-  {
-    id: 2,
-    name: "الرياضيات - الصف الأول الثانوي",
-    students: 20,
-    maxStudents: 20,
-    sessions: 8,
-    totalSessions: 8,
-    earnings: "٦٬٨٠٠ ج.م",
-  },
-  {
-    id: 3,
-    name: "الكيمياء - الصف الثالث الثانوي",
-    students: 15,
-    maxStudents: 20,
-    sessions: 5,
-    totalSessions: 8,
-    earnings: "٥٬١٠٠ ج.م",
-  },
-  {
-    id: 4,
-    name: "العلوم - الصف الثالث الإعدادي",
-    students: 19,
-    maxStudents: 20,
-    sessions: 7,
-    totalSessions: 8,
-    earnings: "٦٬٤٦٠ ج.م",
-  },
-];
+interface Session {
+  _id: string;
+  title: string;
+  date: string;
+  status: string;
+  groupId: { title: string; subject: string };
+}
 
 export default function TeacherDashboard() {
+  const { user } = useAuth();
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [groupsRes, sessionsRes] = await Promise.all([
+          api.get("/groups"),
+          api.get("/sessions"),
+        ]);
+        setGroups(groupsRes.data);
+        setSessions(sessionsRes.data);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const upcomingSessions = sessions
+    .filter((s) => s.status === "SCHEDULED" && new Date(s.date) > new Date())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 3);
+
+  const totalStudents = groups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
+  const totalEarnings = groups.reduce((acc, g) => acc + (g.totalSessionPrice || 0) * (g.students?.length || 0), 0);
+
+  if (loading) {
+    return (
+      <DashboardLayout role="teacher">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout role="teacher">
       <div className="space-y-8">
         {/* Welcome Section */}
         <div className="bg-gradient-to-br from-primary/10 to-secondary/10 rounded-2xl p-8">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
-            مرحباً، أ. محمد 👋
+            مرحباً، أ. {user?.name || "المعلم"} 👋
           </h2>
           <p className="text-lg text-muted-foreground mb-6">
-            إليك ملخص أداءك لهذا الشهر. لديك ٣ حصص قادمة هذا الأسبوع.
+            إليك ملخص أداءك. لديك {upcomingSessions.length} حصص قادمة.
           </p>
           <Link
             href="/teacher/groups"
@@ -136,21 +98,42 @@ export default function TeacherDashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat) => (
-            <div
-              key={stat.title}
-              className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
+          <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <Users className="w-6 h-6 text-blue-500" />
               </div>
-              <p className="text-sm text-muted-foreground mb-1">{stat.title}</p>
-              <p className="text-3xl font-bold text-foreground mb-2">{stat.value}</p>
-              <p className="text-sm text-green-500">{stat.change}</p>
             </div>
-          ))}
+            <p className="text-sm text-muted-foreground mb-1">إجمالي المجموعات</p>
+            <p className="text-3xl font-bold text-foreground mb-2">{groups.length}</p>
+          </div>
+          <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                <BookOpen className="w-6 h-6 text-green-500" />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">إجمالي الطلاب</p>
+            <p className="text-3xl font-bold text-foreground mb-2">{totalStudents}</p>
+          </div>
+          <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                <Wallet className="w-6 h-6 text-purple-500" />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">صافي الأرباح</p>
+            <p className="text-3xl font-bold text-foreground mb-2">{totalEarnings.toLocaleString()} ج.م</p>
+          </div>
+          <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-orange-500" />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">الحصص القادمة</p>
+            <p className="text-3xl font-bold text-foreground mb-2">{upcomingSessions.length}</p>
+          </div>
         </div>
 
         {/* Upcoming Sessions */}
@@ -166,35 +149,32 @@ export default function TeacherDashboard() {
             </Link>
           </div>
           <div className="space-y-4">
-            {upcomingSessions.map((session) => (
-              <div
-                key={session.id}
-                className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
-              >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-base font-medium text-foreground truncate">
-                    {session.group}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {session.date} • {session.time}
-                  </p>
-                </div>
-                <div className="text-left flex-shrink-0">
-                  <p className="text-sm font-medium">
-                    {session.students}/{session.maxStudents} طالب
-                  </p>
-                  <div className="w-24 h-2 bg-muted rounded-full mt-1 overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full"
-                      style={{ width: `${(session.students / session.maxStudents) * 100}%` }}
-                    />
+            {upcomingSessions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">لا توجد حصص قادمة</p>
+            ) : (
+              upcomingSessions.map((session) => (
+                <div
+                  key={session._id}
+                  className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base font-medium text-foreground truncate">
+                      {session.groupId?.title || session.title}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(session.date).toLocaleDateString("ar-EG", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -210,58 +190,31 @@ export default function TeacherDashboard() {
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-right py-4 px-4 text-base font-medium text-muted-foreground">المجموعة</th>
-                  <th className="text-right py-4 px-4 text-base font-medium text-muted-foreground">الطلاب</th>
-                  <th className="text-right py-4 px-4 text-base font-medium text-muted-foreground">الحصص</th>
-                  <th className="text-right py-4 px-4 text-base font-medium text-muted-foreground">الأرباح</th>
-                  <th className="text-right py-4 px-4 text-base font-medium text-muted-foreground">الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentGroups.map((group) => (
-                  <tr key={group.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="py-4 px-4">
-                      <p className="text-base font-medium">{group.name}</p>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{group.students}/{group.maxStudents}</span>
-                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary rounded-full"
-                            style={{ width: `${(group.students / group.maxStudents) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-base">{group.sessions}/{group.totalSessions}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-base font-medium text-green-500">{group.earnings}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      {group.sessions === group.totalSessions ? (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-sm">
-                          <CheckCircle className="w-4 h-4" />
-                          مكتملة
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 text-sm">
-                          <Clock className="w-4 h-4" />
-                          نشطة
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {groups.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-lg font-medium">لا توجد مجموعات بعد</p>
+              <p className="text-muted-foreground mt-1">أنشئ مجموعتك الأولى</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {groups.map((group) => (
+                <div key={group._id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                  <h4 className="font-semibold mb-2">{group.title}</h4>
+                  <p className="text-sm text-muted-foreground mb-3">{group.subject} • {group.grade}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">{group.students?.length || 0} طالب</span>
+                    <Link
+                      href={`/teacher/groups/${group._id}/attendance`}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      التفاصيل
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Quick Actions */}
@@ -287,14 +240,14 @@ export default function TeacherDashboard() {
             <p className="text-sm text-muted-foreground">متابعة أرباحك وطلب السحب</p>
           </Link>
           <Link
-            href="/teacher/groups"
+            href="/teacher/profile"
             className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1"
           >
             <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
               <Calendar className="w-6 h-6 text-purple-500" />
             </div>
-            <h4 className="text-lg font-semibold mb-2">جدول الحصص</h4>
-            <p className="text-sm text-muted-foreground">عرض وإدارة جدولك الأسبوعي</p>
+            <h4 className="text-lg font-semibold mb-2">الملف الشخصي</h4>
+            <p className="text-sm text-muted-foreground">تعديل بياناتك الشخصية</p>
           </Link>
         </div>
       </div>
