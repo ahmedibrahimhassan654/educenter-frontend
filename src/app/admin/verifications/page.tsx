@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -162,7 +161,7 @@ export default function AdminVerificationsPage() {
   ];
 
   return (
-    <DashboardLayout role="admin">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -500,6 +499,6 @@ export default function AdminVerificationsPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

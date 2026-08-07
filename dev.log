@@ -1,0 +1,39 @@
+
+> educenter-frontend@0.1.0 dev
+> next dev
+
+[32m✔[0m [33mConsole Ninja[0m extension is connected to [33mNext.js[0m, see [36mhttps://tinyurl.com/2vt8jxzw[0m
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 25.7s
+ ✓ Compiled /src/middleware in 1931ms
+ ✓ Compiled (130 modules)
+ ⨯ SyntaxError: D:\transfered folder\courses\projects\educenter\educenter-frontend\.next\server\middleware-manifest.json: Unexpected end of JSON input
+    at parse (<anonymous>)
+    at Object..json (node:internal/modules/cjs/loader:2014:39)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1617:12)
+    at mod.require (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:153:16)
+    at DevServer.getMiddlewareManifest (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\next-server.js:938:26)
+    at DevServer.getEdgeFunctionInfo (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\next-server.js:965:31)
+    at DevServer.runMiddleware (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\next-server.js:1059:37)
+    at async DevServer.runMiddleware (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\dev\next-dev-server.js:268:28)
+    at async NextNodeServer.handleCatchallMiddlewareRequest (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\next-server.js:322:26)
+    at async DevServer.handleRequestImpl (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\base-server.js:824:28)
+    at async D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async handleRoute (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\router-utils\resolve-routes.js:313:33)
+    at async resolveRoutes (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\router-utils\resolve-routes.js:552:28)
+    at async handleRequest (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\router-server.js:219:96)
+    at async requestHandlerImpl (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\router-server.js:383:13)
+    at async Server.requestListener (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\start-server.js:143:13)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 5.5s (255 modules)
+[?25h

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import api, { clearAuthCache } from "@/lib/api";
 
 const features = [
   { icon: GraduationCap, text: "أفضل المعلمين المعتمدين" },
@@ -61,14 +61,24 @@ export default function LoginPage() {
       }
 
       if (data.user) {
+        // Drop any cached session/response from a previous identity
+        clearAuthCache();
+
         // Fetch user profile from MongoDB to get role
         try {
           const response = await api.get("/auth/me");
-          const userRole = response.data?.role || "STUDENT";
+          const userRole = response.data?.role;
           const verificationStatus = response.data?.verificationStatus;
-          
+
+          const redirectTarget = roleRedirects[userRole];
+          if (!redirectTarget) {
+            setError("تعذر تحديد نوع الحساب. يرجى المحاولة مرة أخرى.");
+            setLoading(false);
+            return;
+          }
+
           // Redirect unverified teachers to verification page
-          let redirectPath = roleRedirects[userRole] || "/";
+          let redirectPath = redirectTarget;
           if (userRole === "TEACHER" && verificationStatus !== "VERIFIED") {
             redirectPath = "/teacher/verification";
           }
@@ -78,16 +88,11 @@ export default function LoginPage() {
             duration: 3000,
           });
 
-          // Small delay to show toast before redirect
-          setTimeout(() => {
-            router.push(redirectPath);
-            router.refresh();
-          }, 500);
-        } catch {
-          // If fetching profile fails, redirect to home
-          toast.success("تم تسجيل الدخول بنجاح");
-          router.push("/");
+          router.replace(redirectPath);
           router.refresh();
+        } catch {
+          setError("تعذر تحميل بيانات حسابك. يرجى المحاولة مرة أخرى.");
+          setLoading(false);
         }
       }
     } catch {

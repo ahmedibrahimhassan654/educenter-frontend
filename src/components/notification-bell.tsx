@@ -18,17 +18,13 @@ export function NotificationBell({ userId }: NotificationBellProps) {
   const [isMarking, setIsMarking] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Fetch unread count on mount
+  // Fetch notifications on mount and when dropdown opens
   useEffect(() => {
-    fetchUnreadCount();
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+    fetchNotifications();
   }, []);
 
-  // Fetch notifications when dropdown opens
   useEffect(() => {
-    if (isOpen && notifications.length === 0) {
+    if (isOpen) {
       fetchNotifications();
     }
   }, [isOpen]);
@@ -44,20 +40,18 @@ export function NotificationBell({ userId }: NotificationBellProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchUnreadCount = async () => {
-    try {
-      const count = await notificationApi.getUnreadCount();
-      setUnreadCount(count);
-    } catch (error) {
-      console.error("Error fetching unread count:", error);
-    }
-  };
+  const lastFetchRef = useRef<number>(0);
 
   const fetchNotifications = async () => {
+    const now = Date.now();
+    if (now - lastFetchRef.current < 30000) return;
+    lastFetchRef.current = now;
+
     try {
       setIsLoading(true);
       const response = await notificationApi.getNotifications({ limit: 10 });
       setNotifications(response.data);
+      setUnreadCount(response.unreadCount);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     } finally {

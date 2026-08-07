@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -215,7 +214,7 @@ export default function StudentProfilePage() {
   ];
 
   return (
-    <DashboardLayout role="student">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -667,6 +666,6 @@ export default function StudentProfilePage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

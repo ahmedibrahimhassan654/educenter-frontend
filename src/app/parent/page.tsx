@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import DashboardLayout from "@/components/dashboard-layout";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
 import {
@@ -77,17 +76,17 @@ export default function ParentDashboard() {
 
   if (loading) {
     return (
-      <DashboardLayout role="parent">
+      <>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (children.length === 0) {
     return (
-      <DashboardLayout role="parent">
+      <>
         <div className="space-y-8">
           <div className="bg-gradient-to-br from-rose-500/10 to-amber-500/10 rounded-2xl p-8">
             <h2 className="text-2xl md:text-3xl font-bold mb-3">مرحباً، {user?.name || "ولي الأمر"} 👋</h2>
@@ -100,14 +99,14 @@ export default function ParentDashboard() {
             <p className="text-muted-foreground mb-4">استخدم رمز الربط لربط حساب طفلك بحسابك</p>
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   const selectedChildInfo = children.find((c) => c._id === selectedChild);
 
   return (
-    <DashboardLayout role="parent">
+    <>
       <div className="space-y-8">
         <div className="bg-gradient-to-br from-rose-500/10 to-amber-500/10 rounded-2xl p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -226,6 +225,6 @@ export default function ParentDashboard() {
           </Link>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

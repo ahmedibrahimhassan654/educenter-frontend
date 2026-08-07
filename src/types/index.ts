@@ -29,10 +29,24 @@ export interface User {
 
 export interface Group {
   id: string;
-  teacherId: string;
+  teacherId: string | {
+    _id: string;
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    verificationStatus?: string;
+    verificationData?: {
+      experience?: string;
+      curriculum?: string[];
+      bio?: string;
+      documents?: string[];
+    };
+  };
   title: string;
   subject: string;
   grade: string;
+  stage?: string;
   priceTeacherShare: number;
   platformFee: number;
   totalSessionPrice: number;

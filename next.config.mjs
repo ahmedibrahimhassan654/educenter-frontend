@@ -25,7 +25,7 @@ const nextConfig = {
     ],
   },
 
-  // Webpack optimizations
+  // Webpack optimizations (only used when not using Turbopack)
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
       // Enable tree shaking
@@ -35,6 +35,16 @@ const nextConfig = {
         sideEffects: true,
       };
     }
+    
+    // Better file watching in development (webpack only)
+    if (dev && !isServer) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
+    
     return config;
   },
   

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
 import {
   CheckCircle,
   XCircle,
@@ -146,7 +145,7 @@ export default function ParentReportsPage() {
   const childInfo = children.find((c) => c.id === selectedChild)!;
 
   return (
-    <DashboardLayout role="parent">
+    <>
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -252,6 +251,6 @@ export default function ParentReportsPage() {
           </div>
         ))}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

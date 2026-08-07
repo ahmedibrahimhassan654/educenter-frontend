@@ -65,6 +65,7 @@ export default function TeacherVerificationPage() {
   const [documents, setDocuments] = useState<Record<string, UploadedDocument>>({});
 
   const verificationStatus = user?.verificationStatus || "PENDING";
+  const [isResubmitting, setIsResubmitting] = useState(false);
 
   useEffect(() => {
     const fetchCurriculum = async () => {
@@ -133,10 +134,19 @@ export default function TeacherVerificationPage() {
     });
   };
 
+  // Helper to parse curriculum entry into {stage, grade, subject}
+  const parseCurriculumEntry = (entry: string) => {
+    const [key, subjectName] = entry.split(":");
+    const parts = key ? key.split("-") : [];
+    const stage = parts[0] || "";
+    const grade = parts.slice(1).join("-");
+    return { stage, grade, subject: subjectName || entry };
+  };
+
   // Helper to get display name from curriculum entry
   const getDisplayName = (entry: string) => {
-    const parts = entry.split(":");
-    return parts.length > 1 ? parts[1] : entry;
+    const { stage, grade, subject } = parseCurriculumEntry(entry);
+    return { stage, grade, subject };
   };
 
   const handleFileUpload = async (docType: string, file: File) => {
@@ -244,12 +254,9 @@ export default function TeacherVerificationPage() {
     try {
       const documentUrls = Object.values(documents).map((doc) => doc.url);
       
-      // Extract subject names from the unique keys for backend storage
-      const curriculumNames = formData.selectedCurriculum.map(getDisplayName);
-      
       await api.post("/verification/submit", {
         experience: formData.experience,
-        curriculum: curriculumNames,
+        curriculum: formData.selectedCurriculum,
         bio: formData.bio,
         documents: documentUrls,
       });
@@ -321,11 +328,14 @@ export default function TeacherVerificationPage() {
               <div className="bg-muted/50 rounded-lg p-4">
                 {formData.selectedCurriculum.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {formData.selectedCurriculum.map((subject, index) => (
-                      <span key={index} className="px-3 py-1.5 bg-primary/10 text-primary text-sm font-medium rounded-lg">
-                        {getDisplayName(subject)}
-                      </span>
-                    ))}
+                    {formData.selectedCurriculum.map((entry, index) => {
+                      const { stage, grade, subject } = getDisplayName(entry);
+                      return (
+                        <span key={index} className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary text-sm font-medium rounded-lg">
+                          {subject} <span className="text-xs text-muted-foreground">({stage} - {grade})</span>
+                        </span>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-muted-foreground">لم يتم تحديد منهج</p>
@@ -422,7 +432,7 @@ export default function TeacherVerificationPage() {
     );
   }
 
-  if (verificationStatus === "REJECTED") {
+  if (verificationStatus === "REJECTED" && !isResubmitting) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-card border rounded-2xl p-8 text-center">
@@ -441,10 +451,7 @@ export default function TeacherVerificationPage() {
           )}
           <div className="space-y-3">
             <button
-              onClick={() => {
-                refreshUser();
-                window.location.reload();
-              }}
+              onClick={() => setIsResubmitting(true)}
               className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
             >
               إعادة تقديم الطلب
@@ -474,6 +481,26 @@ export default function TeacherVerificationPage() {
             يرجى ملء المعلومات التالية وإرفاق المستندات المطلوبة لإكمال عملية التحقق
           </p>
         </div>
+
+        {/* Resubmission notice */}
+        {isResubmitting && verificationStatus === "REJECTED" && (
+          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">إعادة تقديم الطلب</p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                  تم رفض طلبك السابق. يرجى تعديل المعلومات وإعادة الإرسال.
+                </p>
+                {user?.verificationNotes && (
+                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
+                    <strong>سبب الرفض:</strong> {user.verificationNotes}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -552,13 +579,22 @@ export default function TeacherVerificationPage() {
               </div>
             )}
 
-            {formData.selectedCurriculum.length > 0 && (
-              <div className="mt-4 p-3 bg-primary/10 rounded-lg">
-                <p className="text-sm font-medium text-primary">
-                  المختارة: {formData.selectedCurriculum.map(getDisplayName).join("، ")}
-                </p>
-              </div>
-            )}
+             {formData.selectedCurriculum.length > 0 && (
+               <div className="mt-4 p-3 bg-primary/10 rounded-lg">
+                 <p className="text-sm font-medium text-primary mb-2">المختارة:</p>
+                 <div className="flex flex-wrap gap-1">
+                   {formData.selectedCurriculum.map((entry, i) => {
+                     const { stage, grade, subject } = getDisplayName(entry);
+                     return (
+                       <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-background rounded text-xs">
+                         <span className="font-medium">{subject}</span>
+                         <span className="text-muted-foreground">({stage} - {grade})</span>
+                       </span>
+                     );
+                   })}
+                 </div>
+               </div>
+             )}
           </div>
 
           {/* Documents Upload */}

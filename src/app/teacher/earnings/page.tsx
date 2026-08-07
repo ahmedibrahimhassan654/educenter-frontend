@@ -1,6 +1,5 @@
 "use client";
 
-import DashboardLayout from "@/components/dashboard-layout";
 import {
   Wallet,
   TrendingUp,
@@ -87,7 +86,7 @@ const payoutHistory = [
 
 export default function TeacherEarningsPage() {
   return (
-    <DashboardLayout role="teacher">
+    <>
       <div className="space-y-8">
         {/* Header */}
         <div>
@@ -328,6 +327,6 @@ export default function TeacherEarningsPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

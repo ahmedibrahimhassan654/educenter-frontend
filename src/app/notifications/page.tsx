@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import notificationApi, { Notification } from "@/lib/notification-api";
-import { useAuth } from "@/components/auth-provider";
 import { toast } from "sonner";
 import {
   Bell,
@@ -51,7 +50,6 @@ const categoryLabels: Record<string, string> = {
 };
 
 export default function NotificationsPage() {
-  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -147,10 +145,8 @@ export default function NotificationsPage() {
       ? notifications
       : notifications.filter((n) => n.type === typeFilter);
 
-  const role = user?.role?.toLowerCase() as "admin" | "teacher" | "student" | "parent";
-
   return (
-    <DashboardLayout role={role || "admin"}>
+    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

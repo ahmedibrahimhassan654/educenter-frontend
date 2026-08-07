@@ -17,8 +17,6 @@ import {
   Menu,
   X,
   GraduationCap,
-  Settings,
-  BookOpen,
   UserCircle,
   School,
   Shield,
@@ -67,12 +65,9 @@ const adminLinks: SidebarLink[] = [
   { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/admin/users", label: "المستخدمين", icon: Users },
   { href: "/admin/verifications", label: "طلبات التحقق", icon: Shield },
-  { href: "/admin/groups", label: "المجموعات", icon: BookOpen },
   { href: "/admin/curriculum", label: "المنهاج الدراسي", icon: School },
-  { href: "/admin/payments", label: "المدفوعات", icon: Wallet },
   { href: "/notifications", label: "الإشعارات", icon: Bell },
   { href: "/admin/profile", label: "الملف الشخصي", icon: UserCircle },
-  { href: "/admin/settings", label: "الإعدادات", icon: Settings },
 ];
 
 const roleLinks: Record<string, SidebarLink[]> = {
@@ -89,40 +84,31 @@ const roleLabels: Record<string, string> = {
   admin: "مدير",
 };
 
-const roleNames: Record<string, string> = {
-  teacher: "أ. محمد الأحمد",
-  student: "أحمد محمد",
-  parent: "أم عبدالله",
-  admin: "أحمد إبراهيم",
-};
-
 export default function DashboardLayout({
   children,
-  role,
 }: {
   children: React.ReactNode;
-  role: "teacher" | "student" | "parent" | "admin";
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  // Navigation is always derived from the authenticated user, never the route
+  const activeRole = (user?.role || "").toLowerCase();
+
   // Check if teacher needs to complete verification
-  const isPendingTeacher = role === "teacher" && 
-    user?.role === "TEACHER" && 
-    user?.verificationStatus === "PENDING";
+  const isPendingTeacher =
+    user?.role === "TEACHER" && user?.verificationStatus === "PENDING";
 
   // Check if teacher is awaiting verification
-  const isSubmittedTeacher = role === "teacher" && 
-    user?.role === "TEACHER" && 
-    user?.verificationStatus === "SUBMITTED";
+  const isSubmittedTeacher =
+    user?.role === "TEACHER" && user?.verificationStatus === "SUBMITTED";
 
   // Check if teacher is rejected
-  const isRejectedTeacher = role === "teacher" && 
-    user?.role === "TEACHER" && 
-    user?.verificationStatus === "REJECTED";
+  const isRejectedTeacher =
+    user?.role === "TEACHER" && user?.verificationStatus === "REJECTED";
 
   // Redirect all non-VERIFIED teachers to verification page
   const isRestrictedTeacher = isPendingTeacher || isSubmittedTeacher || isRejectedTeacher;
@@ -132,7 +118,10 @@ export default function DashboardLayout({
       router.push("/teacher/verification");
     }
   }, [isRestrictedTeacher, pathname, router]);
-  const links = isRestrictedTeacher ? unverifiedTeacherLinks : roleLinks[role];
+
+  const links = isRestrictedTeacher
+    ? unverifiedTeacherLinks
+    : roleLinks[activeRole] ?? [];
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -148,8 +137,29 @@ export default function DashboardLayout({
     }
   };
 
-  const displayName = user?.name || roleNames[role];
+  const displayName = user?.name || "";
   const avatarUrl = (user as any)?.avatarUrl;
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex" dir="rtl">
+        <aside className="hidden lg:flex flex-col w-72 min-h-screen bg-background border-l">
+          <div className="p-6 border-b">
+            <div className="h-10 w-40 rounded bg-muted animate-pulse" />
+          </div>
+          <div className="flex-1 p-4 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-12 rounded-lg bg-muted animate-pulse" />
+            ))}
+          </div>
+        </aside>
+        <main className="flex-1 p-6 md:p-8 lg:p-10">
+          <div className="h-8 w-56 rounded bg-muted animate-pulse mb-6" />
+          <div className="h-64 rounded-xl bg-muted animate-pulse" />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/30" dir="rtl">
@@ -179,7 +189,7 @@ export default function DashboardLayout({
               <Image src="/logo.png" alt="إديو سنتر" width={40} height={40} />
               <div>
                 <span className="text-lg font-bold">إديو سنتر</span>
-                <p className="text-xs text-muted-foreground">{roleLabels[role]}</p>
+                <p className="text-xs text-muted-foreground">{roleLabels[activeRole]}</p>
               </div>
             </Link>
           </div>
@@ -282,7 +292,7 @@ export default function DashboardLayout({
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{displayName}</p>
-                <p className="text-xs text-muted-foreground">{roleLabels[role]}</p>
+                <p className="text-xs text-muted-foreground">{roleLabels[activeRole]}</p>
               </div>
             </div>
             <button
@@ -309,7 +319,7 @@ export default function DashboardLayout({
                   <Image src="/logo.png" alt="إديو سنتر" width={40} height={40} />
                   <div>
                     <span className="text-lg font-bold">إديو سنتر</span>
-                    <p className="text-xs text-muted-foreground">{roleLabels[role]}</p>
+                    <p className="text-xs text-muted-foreground">{roleLabels[activeRole]}</p>
                   </div>
                 </Link>
               </div>
@@ -362,7 +372,7 @@ export default function DashboardLayout({
             <div className="flex items-center gap-4">
               <NotificationBell userId={(user as any)?._id || user?.id || ""} />
               <DynamicThemeToggle />
-              <Link href={`/${role}/profile`} className="flex items-center gap-2">
+              <Link href={`/${activeRole}/profile`} className="flex items-center gap-2">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}

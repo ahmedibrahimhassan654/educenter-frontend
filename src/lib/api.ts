@@ -56,11 +56,16 @@ const LONG_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for rarely changing data
 // Endpoints that can be cached longer
 const longCacheEndpoints = ["/curriculum", "/groups?explore=true"];
 
+// Auth endpoints must never be cached - stale role data breaks redirects
+const neverCacheEndpoints = ["/auth/"];
+
 function getCacheKey(config: any): string | null {
   // Only cache GET requests
   if (config.method !== "get") return null;
-  
+
   const url = config.url || "";
+  if (neverCacheEndpoints.some((endpoint) => url.includes(endpoint))) return null;
+
   const params = JSON.stringify(config.params || {});
   return `${url}:${params}`;
 }
@@ -141,6 +146,27 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Clear every cached artifact tied to the current identity
+export function clearAuthCache() {
+  cachedSession = null;
+  sessionExpiry = 0;
+  responseCache.clear();
+}
+
+// Keep caches in sync with the Supabase auth lifecycle
+if (typeof window !== "undefined") {
+  getSupabaseClient().auth.onAuthStateChange((event) => {
+    if (
+      event === "SIGNED_IN" ||
+      event === "SIGNED_OUT" ||
+      event === "TOKEN_REFRESHED" ||
+      event === "USER_UPDATED"
+    ) {
+      clearAuthCache();
+    }
+  });
+}
 
 // Helper to clear cache for specific endpoints
 export function clearCache(pattern?: string) {

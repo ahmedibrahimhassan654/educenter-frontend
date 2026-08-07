@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import DashboardLayout from "@/components/dashboard-layout";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
 import {
@@ -71,16 +70,16 @@ export default function TeacherDashboard() {
 
   if (loading) {
     return (
-      <DashboardLayout role="teacher">
+      <>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout role="teacher">
+    <>
       <div className="space-y-8">
         {/* Verification Status Banner */}
         {user?.verificationStatus === "SUBMITTED" && (
@@ -289,6 +288,6 @@ export default function TeacherDashboard() {
           </Link>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

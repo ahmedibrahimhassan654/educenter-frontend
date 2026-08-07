@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Metadata } from "next";
 import { DynamicThemeToggle } from "@/lib/dynamic-imports";
+import PublicNavActions from "@/components/public-nav-actions";
 import { JsonLd } from "@/components/json-ld";
 import { generateBreadcrumbSchema } from "@/lib/seo";
 import {
@@ -178,18 +179,7 @@ export default function ForTeachersPage() {
           </nav>
           <div className="flex items-center gap-4">
             <DynamicThemeToggle />
-            <Link
-              href="/login"
-              className="text-base font-medium hover:text-primary transition-colors"
-            >
-              تسجيل الدخول
-            </Link>
-            <Link
-              href="/register/teacher"
-              className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-base font-medium hover:bg-primary/90 transition-colors"
-            >
-              سجّل كمعلم
-            </Link>
+            <PublicNavActions ctaHref="/register/teacher" ctaLabel="سجّل كمعلم" />
           </div>
         </div>
       </header>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
 import api from "@/lib/api";
 import {
   Search,
@@ -21,7 +20,13 @@ interface Group {
   title: string;
   subject: string;
   grade: string;
-  teacherId: { name: string; email: string };
+  teacherId: {
+    name: string;
+    email: string;
+    verificationData?: {
+      curriculum?: string[];
+    };
+  };
   students: any[];
   scheduleDays?: string[];
   totalSessionPrice?: number;
@@ -79,16 +84,16 @@ export default function StudentExplorePage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="student">
+      <>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout role="student">
+    <>
       <div className="space-y-8">
         {/* Header */}
         <div>
@@ -173,6 +178,22 @@ export default function StudentExplorePage() {
                     </div>
                   </div>
 
+                  {(group.teacherId as any)?.verificationData?.curriculum && (group.teacherId as any).verificationData.curriculum.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {(group.teacherId as any).verificationData.curriculum.map((entry: string, i: number) => {
+                        const [key, subjectName] = entry.split(":");
+                        const parts = key ? key.split("-") : [];
+                        const stage = parts[0] || "";
+                        const grade = parts.slice(1).join("-");
+                        return (
+                          <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs">
+                            {subjectName} <span className="text-muted-foreground">({stage} - {grade})</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <BookOpen className="w-4 h-4" />
@@ -211,6 +232,6 @@ export default function StudentExplorePage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

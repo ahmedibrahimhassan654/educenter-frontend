@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
 import {
   Wallet,
   CreditCard,
@@ -91,7 +90,7 @@ export default function ParentPaymentsPage() {
     .reduce((sum, inv) => sum + parseInt(inv.total.replace(/[^\d]/g, "")), 0);
 
   return (
-    <DashboardLayout role="parent">
+    <>
       <div className="space-y-8">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold">المدفوعات والفواتير</h2>
@@ -229,6 +228,6 @@ export default function ParentPaymentsPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

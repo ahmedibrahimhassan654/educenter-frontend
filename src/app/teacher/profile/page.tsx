@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -262,7 +261,7 @@ export default function TeacherProfilePage() {
   ];
 
   return (
-    <DashboardLayout role="teacher">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -576,59 +575,67 @@ export default function TeacherProfilePage() {
                     </Button>
                   </div>
 
-                  <div className="space-y-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="subjects">المواد التي تدرسها</Label>
-                      <Input
-                        id="subjects"
-                        value={formData.subjects}
-                        onChange={(e) => setFormData({ ...formData, subjects: e.target.value })}
-                        placeholder="مثال: فيزياء، رياضيات، كيمياء"
-                      />
-                      <p className="text-xs text-muted-foreground">افصل بين المواد بفاصلة</p>
+                  {/* Verification Info from Registration */}
+                  <div className="mb-6 p-5 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-200 dark:border-green-500/20">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <h4 className="font-semibold text-green-700 dark:text-green-500">بيانات التحقق المقدمة</h4>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="experience">سنوات الخبرة</Label>
-                      <Input
-                        id="experience"
-                        value={formData.experience}
-                        onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                        placeholder="مثال: ٥ سنوات"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="education">المؤهل التعليمي</Label>
-                      <Input
-                        id="education"
-                        value={formData.education}
-                        onChange={(e) => setFormData({ ...formData, education: e.target.value })}
-                        placeholder="مثال: بكالوريوس فيزياء"
-                      />
-                    </div>
-
-                    {/* Certifications */}
-                    <div className="border-t pt-5">
-                      <h4 className="font-semibold mb-4">الشهادات والاعتمادات</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-500/10 rounded-lg border border-green-200 dark:border-green-500/20">
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">معلم معتمد</p>
-                            <p className="text-xs text-muted-foreground">تم التحقق من هويتك ومؤهلاتك</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border">
-                          <Award className="w-5 h-5 text-yellow-500" />
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">معلم مميز</p>
-                            <p className="text-xs text-muted-foreground">تقييم ٤.٥ أو أعلى لمدة ٣ أشهر</p>
-                          </div>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">الحالة: </span>
+                        <span className="font-medium">
+                          {(user as any)?.verificationStatus === "VERIFIED" ? "معتمد ✓" :
+                           (user as any)?.verificationStatus === "PENDING" ? "قيد المراجعة" :
+                           (user as any)?.verificationStatus === "REJECTED" ? "مرفوض" : "لم يقدم"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">الخبرة: </span>
+                        <span className="font-medium">{(user as any)?.verificationData?.experience || formData.experience || "غير محدد"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">السيرة الذاتية: </span>
+                        <span className="font-medium">{(user as any)?.verificationData?.bio || formData.bio || "غير مضافة"}</span>
+                      </div>
+                      <div className="md:col-span-2">
+                        <span className="text-muted-foreground">المناهج: </span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Array.isArray((user as any)?.verificationData?.curriculum) &&
+                          (user as any).verificationData.curriculum.length > 0 ? (
+                            (user as any).verificationData.curriculum.map((entry: string, i: number) => {
+                              const [key, subjectName] = entry.split(":");
+                              const parts = key ? key.split("-") : [];
+                              const stage = parts[0] || "";
+                              const grade = parts.slice(1).join("-");
+                              return (
+                                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs">
+                                  <span className="font-medium">{subjectName}</span>
+                                  <span className="text-muted-foreground">({stage} - {grade})</span>
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="font-medium">{formData.subjects || "غير محددة"}</span>
+                          )}
                         </div>
                       </div>
+                      {(user as any)?.verificationData?.documents?.length > 0 && (
+                        <div className="md:col-span-2">
+                          <span className="text-muted-foreground">المستندات: </span>
+                          <span className="font-medium">{(user as any).verificationData.documents.length} مستند مرفق</span>
+                        </div>
+                      )}
+                      {(user as any)?.verifiedAt && (
+                        <div className="md:col-span-2">
+                          <span className="text-muted-foreground">تاريخ الاعتماد: </span>
+                          <span className="font-medium">{new Date((user as any).verifiedAt).toLocaleDateString("ar-EG")}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
+
+
                 </div>
               )}
 
@@ -814,6 +821,6 @@ export default function TeacherProfilePage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

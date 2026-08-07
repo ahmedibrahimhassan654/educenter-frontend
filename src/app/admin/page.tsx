@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import DashboardLayout from "@/components/dashboard-layout";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
 import {
@@ -83,16 +82,16 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <DashboardLayout role="admin">
+      <>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout role="admin">
+    <>
       <div className="space-y-8">
         {/* Welcome Section */}
         <div className="bg-gradient-to-br from-primary/10 to-secondary/10 rounded-2xl p-8">
@@ -236,6 +235,6 @@ export default function AdminDashboard() {
           </Link>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

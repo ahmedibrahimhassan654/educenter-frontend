@@ -27,6 +27,13 @@ const roleDashboards: Record<string, string> = {
   PARENT: "/parent",
 };
 
+// Roles that actually have a profile page implemented
+const roleProfiles: Record<string, string> = {
+  ADMIN: "/admin/profile",
+  TEACHER: "/teacher/profile",
+  STUDENT: "/student/profile",
+};
+
 export default function UserMenu() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
@@ -131,14 +138,16 @@ export default function UserMenu() {
               <LayoutDashboard className="w-5 h-5 text-muted-foreground" />
               <span className="text-base">لوحة التحكم</span>
             </Link>
-            <Link
-              href={`/${user.role.toLowerCase()}/profile`}
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted transition-colors"
-            >
-              <User className="w-5 h-5 text-muted-foreground" />
-              <span className="text-base">الملف الشخصي</span>
-            </Link>
+            {roleProfiles[user.role] && (
+              <Link
+                href={roleProfiles[user.role]}
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+              >
+                <User className="w-5 h-5 text-muted-foreground" />
+                <span className="text-base">الملف الشخصي</span>
+              </Link>
+            )}
           </div>
 
           {/* Logout */}

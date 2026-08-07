@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -223,16 +222,16 @@ export default function AdminCurriculumPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout role="admin">
+      <>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout role="admin">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -454,6 +453,6 @@ export default function AdminCurriculumPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
 import {
@@ -90,16 +89,16 @@ export default function StudentProgressPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="student">
+      <>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout role="student">
+    <>
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -227,6 +226,6 @@ export default function StudentProgressPage() {
           })
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

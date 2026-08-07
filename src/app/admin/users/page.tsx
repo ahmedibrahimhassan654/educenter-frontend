@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import DashboardLayout from "@/components/dashboard-layout";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import api from "@/lib/api";
+import api, { clearCache } from "@/lib/api";
 import { toast } from "sonner";
 import {
   Users,
@@ -30,6 +29,7 @@ import {
   MoreVertical,
   Download,
   Filter,
+  RefreshCw,
   Eye,
   Clock,
   Activity,
@@ -38,6 +38,7 @@ import {
 
 interface User {
   _id: string;
+  id?: string;
   name: string;
   email: string;
   phone: string;
@@ -45,6 +46,12 @@ interface User {
   subscriptionStatus: boolean;
   avatarUrl?: string;
   verificationStatus?: "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
+  verificationData?: {
+    experience?: string;
+    curriculum?: string[];
+    bio?: string;
+    documents?: string[];
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +76,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
     limit: 20,
@@ -98,10 +106,26 @@ export default function AdminUsersPage() {
     password: "",
   });
 
-  // Fetch users with filters
-  const fetchUsers = useCallback(async () => {
+  // Cache for users data
+  const usersCacheRef = useRef<{ key: string; data: User[]; pagination: Pagination; timestamp: number } | null>(null);
+  const CACHE_DURATION = 30000; // 30 seconds
+
+  // Fetch users with filters and caching
+  const fetchUsers = useCallback(async (forceRefresh = false, silent = false) => {
+    const cacheKey = `${pagination.page}-${pagination.limit}-${searchQuery}-${roleFilter}`;
+
+    // Use cache if available and not expired
+    if (!forceRefresh && usersCacheRef.current && usersCacheRef.current.key === cacheKey) {
+      const isCacheValid = Date.now() - usersCacheRef.current.timestamp < CACHE_DURATION;
+      if (isCacheValid) {
+        setUsers(usersCacheRef.current.data);
+        setPagination(usersCacheRef.current.pagination);
+        return;
+      }
+    }
+
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
@@ -114,16 +138,24 @@ export default function AdminUsersPage() {
       if (response.data.success) {
         setUsers(response.data.data);
         setPagination(response.data.pagination);
+        usersCacheRef.current = {
+          key: cacheKey,
+          data: response.data.data,
+          pagination: response.data.pagination,
+          timestamp: Date.now(),
+        };
       }
+      return true;
     } catch (error: any) {
       toast.error("خطأ في جلب المستخدمين");
+      return false;
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [pagination.page, searchQuery, roleFilter]);
 
   // Fetch stats
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await api.get("/users/stats");
       if (response.data.success) {
@@ -132,11 +164,26 @@ export default function AdminUsersPage() {
     } catch (error) {
       console.error("Error fetching stats:", error);
     }
-  };
+  }, []);
+
+  // Manual refresh: bypasses both the page cache and the axios response cache
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      clearCache("/users");
+      usersCacheRef.current = null;
+      const ok = await fetchUsers(true, true);
+      await fetchStats();
+      if (ok) toast.success("تم تحديث البيانات");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, fetchUsers, fetchStats]);
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [fetchStats]);
 
   useEffect(() => {
     fetchUsers();
@@ -202,7 +249,7 @@ export default function AdminUsersPage() {
         await api.put(`/users/${selectedUser._id}`, formData);
         toast.success("تم تحديث المستخدم بنجاح");
       }
-      await fetchUsers();
+      await fetchUsers(true);
       await fetchStats();
       setFormData({ name: "", email: "", phone: "", role: "STUDENT", password: "" });
       setShowModal(false);
@@ -221,7 +268,7 @@ export default function AdminUsersPage() {
     try {
       await api.delete(`/users/${userId}`);
       toast.success("تم حذف المستخدم بنجاح");
-      await fetchUsers();
+      await fetchUsers(true);
       await fetchStats();
       setShowDeleteConfirm(null);
     } catch (error: any) {
@@ -278,7 +325,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <DashboardLayout role="admin">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -289,6 +336,16 @@ export default function AdminUsersPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title="تحديث البيانات"
+              aria-label="تحديث البيانات"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            </Button>
             <Button variant="outline" onClick={handleExport} className="gap-2">
               <Download className="w-4 h-4" />
               تصدير
@@ -673,171 +730,123 @@ export default function AdminUsersPage() {
 
       {/* View User Modal */}
       {showViewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowViewModal(null)} />
-          <div className="relative bg-background rounded-xl w-full max-w-lg mx-4 shadow-xl overflow-hidden">
+          <div className="relative bg-background rounded-xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="bg-gradient-to-br from-primary/10 to-secondary/10 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold">معلومات المستخدم</h3>
-                <button onClick={() => setShowViewModal(null)} className="p-1 hover:bg-muted rounded">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="flex items-center gap-4">
+            <div className="sticky top-0 bg-background p-4 border-b flex items-center justify-between z-10">
+              <div className="flex items-center gap-3">
                 {showViewModal.avatarUrl ? (
-                  <img
-                    src={showViewModal.avatarUrl}
-                    alt={showViewModal.name}
-                    className="w-16 h-16 rounded-full object-cover ring-4 ring-background"
-                  />
+                  <img src={showViewModal.avatarUrl} alt={showViewModal.name} className="w-10 h-10 rounded-full object-cover" />
                 ) : (
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center ring-4 ring-background">
-                    <span className="text-2xl font-bold text-primary">
-                      {showViewModal.name.charAt(0)}
-                    </span>
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <span className="text-lg font-bold text-primary">{showViewModal.name.charAt(0)}</span>
                   </div>
                 )}
                 <div>
-                  <h4 className="text-xl font-bold">{showViewModal.name}</h4>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <Badge variant="outline" className={`${getRoleBadge(showViewModal.role).bg} ${getRoleBadge(showViewModal.role).text} border-0`}>
-                      <span className="flex items-center gap-1">
-                        {getRoleIcon(showViewModal.role)}
-                        {getRoleBadge(showViewModal.role).label}
-                      </span>
-                    </Badge>
-                    {(showViewModal.role === "TEACHER" || showViewModal.role === "STUDENT") && 
-                     (Date.now() - new Date(showViewModal.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000 && (
-                      <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-0">
-                        <Sparkles className="w-3 h-3 ml-1" />
-                        {showViewModal.role === "TEACHER" ? "معلم جديد" : "طالب جديد"}
-                      </Badge>
-                    )}
-                  </div>
+                  <h4 className="font-bold">{showViewModal.name}</h4>
+                  <Badge variant="outline" className={`${getRoleBadge(showViewModal.role).bg} ${getRoleBadge(showViewModal.role).text} border-0 text-xs`}>
+                    {getRoleBadge(showViewModal.role).label}
+                  </Badge>
                 </div>
               </div>
+              <button onClick={() => setShowViewModal(null)} className="p-1 hover:bg-muted rounded">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Content */}
-            <div className="p-6 space-y-4">
-              <h4 className="font-semibold text-sm text-muted-foreground">المعلومات الشخصية</h4>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">البريد الإلكتروني</p>
-                    <p className="font-medium" dir="ltr">{showViewModal.email}</p>
-                  </div>
+            <div className="p-4 space-y-3">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2.5 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" /> البريد</p>
+                  <p className="font-medium text-sm truncate" dir="ltr">{showViewModal.email}</p>
                 </div>
-
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                    <Phone className="w-5 h-5 text-green-500" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">رقم الهاتف</p>
-                    <p className="font-medium" dir="ltr">{showViewModal.phone}</p>
-                  </div>
+                <div className="p-2.5 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> الهاتف</p>
+                  <p className="font-medium text-sm" dir="ltr">{showViewModal.phone}</p>
                 </div>
-
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-purple-500" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">الدور</p>
-                    <p className="font-medium">{getRoleBadge(showViewModal.role).label}</p>
-                  </div>
+                <div className="p-2.5 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> التسجيل</p>
+                  <p className="font-medium text-sm">{formatDate(showViewModal.createdAt)}</p>
                 </div>
-
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-cyan-500" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">تاريخ التسجيل</p>
-                    <p className="font-medium">{formatDate(showViewModal.createdAt)}</p>
-                  </div>
+                <div className="p-2.5 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> آخر تحديث</p>
+                  <p className="font-medium text-sm">{formatDate(showViewModal.updatedAt)}</p>
                 </div>
-
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-pink-500" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">آخر تحديث</p>
-                    <p className="font-medium">{formatDate(showViewModal.updatedAt)}</p>
-                  </div>
-                </div>
-
-                {(showViewModal.role === "TEACHER" || showViewModal.role === "STUDENT") && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground">الحالة</p>
-                      <p className="font-medium">
-                        {(Date.now() - new Date(showViewModal.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000
-                          ? (showViewModal.role === "TEACHER" ? "معلم جديد" : "طالب جديد")
-                          : (showViewModal.role === "TEACHER" ? "معلم نشط" : "طالب نشط")
-                        }
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {showViewModal.role === "TEACHER" && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-indigo-500" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground">حالة التحقق</p>
-                      <Badge variant="outline" className={`${getVerificationBadge(showViewModal.verificationStatus).bg} ${getVerificationBadge(showViewModal.verificationStatus).text} border-0 mt-1`}>
-                        <span className="flex items-center gap-1">
-                          {(() => {
-                            const badge = getVerificationBadge(showViewModal.verificationStatus);
-                            const Icon = badge.icon;
-                            return <Icon className="w-3 h-3" />;
-                          })()}
-                          {getVerificationBadge(showViewModal.verificationStatus).label}
-                        </span>
-                      </Badge>
-                    </div>
-                  </div>
-                )}
               </div>
+
+              {/* Teacher-specific info */}
+              {showViewModal.role === "TEACHER" && (
+                <>
+                  {/* Verification Status */}
+                  <div className="p-2.5 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">حالة التحقق</p>
+                    <Badge variant="outline" className={`${getVerificationBadge(showViewModal.verificationStatus).bg} ${getVerificationBadge(showViewModal.verificationStatus).text} border-0`}>
+                      <span className="flex items-center gap-1">
+                        {(() => { const b = getVerificationBadge(showViewModal.verificationStatus); const I = b.icon; return <I className="w-3 h-3" />; })()}
+                        {getVerificationBadge(showViewModal.verificationStatus).label}
+                      </span>
+                    </Badge>
+                  </div>
+
+                  {/* Subjects */}
+                  {showViewModal.verificationData?.curriculum && showViewModal.verificationData.curriculum.length > 0 && (
+                    <div className="p-2.5 bg-green-500/5 border border-green-500/20 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><GraduationCap className="w-3 h-3 text-green-500" /> المواد التي يدرسها</p>
+                      <div className="flex flex-wrap gap-1">
+                        {showViewModal.verificationData.curriculum.map((entry: string, i: number) => {
+                          const [key, subjectName] = entry.split(":");
+                          const parts = key ? key.split("-") : [];
+                          const stage = parts[0] || "";
+                          const grade = parts.slice(1).join("-");
+                          return (
+                            <Badge key={i} variant="outline" className="bg-green-500/10 text-green-600 border-0 text-xs">
+                              {subjectName} <span className="text-muted-foreground">({stage} - {grade})</span>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Experience */}
+                  {showViewModal.verificationData?.experience && (
+                    <div className="p-2.5 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Activity className="w-3 h-3 text-orange-500" /> الخبرة</p>
+                      <p className="font-medium text-sm">{showViewModal.verificationData.experience}</p>
+                    </div>
+                  )}
+
+                  {/* Bio */}
+                  {showViewModal.verificationData?.bio && (
+                    <div className="p-2.5 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookOpen className="w-3 h-3 text-blue-500" /> السيرة الذاتية</p>
+                      <p className="text-sm">{showViewModal.verificationData.bio}</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Footer */}
-            <div className="p-6 border-t bg-muted/30 flex gap-2">
+            <div className="sticky bottom-0 bg-background p-4 border-t flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setShowViewModal(null);
-                  openEditModal(showViewModal);
-                }}
+                onClick={() => { setShowViewModal(null); openEditModal(showViewModal); }}
                 className="flex-1 gap-2"
               >
                 <Edit2 className="w-4 h-4" />
                 تعديل
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowViewModal(null)}
-                className="flex-1"
-              >
+              <Button variant="outline" onClick={() => setShowViewModal(null)} className="flex-1">
                 إغلاق
               </Button>
             </div>
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

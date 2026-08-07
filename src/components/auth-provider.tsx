@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@/types";
-import api from "@/lib/api";
+import api, { clearAuthCache } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -74,12 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event) => {
-        if (event === "SIGNED_IN") {
+        if (event === "SIGNED_IN" || event === "USER_UPDATED") {
           await fetchUser(true); // Force refresh on sign in
         } else if (event === "SIGNED_OUT") {
           setUser(null);
           cachedUser = null;
           userCacheExpiry = 0;
+          setIsLoading(false);
         }
       }
     );
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     cachedUser = null;
     userCacheExpiry = 0;
+    clearAuthCache();
   };
 
   const refreshUser = useCallback(async () => {

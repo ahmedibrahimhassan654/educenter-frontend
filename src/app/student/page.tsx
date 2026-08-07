@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import DashboardLayout from "@/components/dashboard-layout";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
 import {
@@ -22,7 +21,13 @@ interface Group {
   title: string;
   subject: string;
   grade: string;
-  teacherId: { name: string; email: string };
+  teacherId: {
+    name: string;
+    email: string;
+    verificationData?: {
+      curriculum?: string[];
+    };
+  };
   students: any[];
   scheduleDays?: string;
 }
@@ -68,16 +73,16 @@ export default function StudentDashboard() {
 
   if (loading) {
     return (
-      <DashboardLayout role="student">
+      <>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout role="student">
+    <>
       <div className="space-y-8">
         {/* Welcome Section */}
         <div className="bg-gradient-to-br from-cyan-500/10 to-violet-500/10 rounded-2xl p-8">
@@ -188,6 +193,21 @@ export default function StudentDashboard() {
                       <Users className="w-4 h-4" />
                       <span>{group.teacherId?.name || "غير محدد"}</span>
                     </div>
+                    {(group.teacherId as any)?.verificationData?.curriculum && (group.teacherId as any).verificationData.curriculum.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {(group.teacherId as any).verificationData.curriculum.map((entry: string, i: number) => {
+                          const [key, subjectName] = entry.split(":");
+                          const parts = key ? key.split("-") : [];
+                          const stage = parts[0] || "";
+                          const grade = parts.slice(1).join("-");
+                          return (
+                            <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs">
+                              {subjectName} <span className="text-muted-foreground">({stage} - {grade})</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
                       <span>{group.scheduleDays || "غير محدد"}</span>
@@ -290,6 +310,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

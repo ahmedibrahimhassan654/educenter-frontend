@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Metadata } from "next";
 import { DynamicThemeToggle } from "@/lib/dynamic-imports";
+import PublicNavActions from "@/components/public-nav-actions";
 import {
   Eye,
   Shield,
@@ -191,12 +192,7 @@ export default function ForParentsPage() {
           </nav>
           <div className="flex items-center gap-4">
             <DynamicThemeToggle />
-            <Link
-              href="/register"
-              className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-base font-medium hover:bg-primary/90 transition-colors"
-            >
-              ابدأ الآن
-            </Link>
+            <PublicNavActions ctaHref="/register" ctaLabel="ابدأ الآن" />
           </div>
         </div>
       </header>
