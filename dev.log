@@ -8,32 +8,60 @@
   - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 25.7s
- ✓ Compiled /src/middleware in 1931ms
- ✓ Compiled (130 modules)
- ⨯ SyntaxError: D:\transfered folder\courses\projects\educenter\educenter-frontend\.next\server\middleware-manifest.json: Unexpected end of JSON input
-    at parse (<anonymous>)
-    at Object..json (node:internal/modules/cjs/loader:2014:39)
-    at Module.load (node:internal/modules/cjs/loader:1594:32)
-    at Module._load (node:internal/modules/cjs/loader:1396:12)
-    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
-    at Module.<anonymous> (node:internal/modules/cjs/loader:1617:12)
-    at mod.require (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\require-hook.js:65:28)
-    at require (node:internal/modules/helpers:153:16)
-    at DevServer.getMiddlewareManifest (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\next-server.js:938:26)
-    at DevServer.getEdgeFunctionInfo (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\next-server.js:965:31)
-    at DevServer.runMiddleware (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\next-server.js:1059:37)
-    at async DevServer.runMiddleware (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\dev\next-dev-server.js:268:28)
-    at async NextNodeServer.handleCatchallMiddlewareRequest (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\next-server.js:322:26)
-    at async DevServer.handleRequestImpl (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\base-server.js:824:28)
-    at async D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\dev\next-dev-server.js:339:20
-    at async Span.traceAsyncFn (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\trace\trace.js:154:20)
-    at async DevServer.handleRequest (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
-    at async handleRoute (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\router-utils\resolve-routes.js:313:33)
-    at async resolveRoutes (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\router-utils\resolve-routes.js:552:28)
-    at async handleRequest (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\router-server.js:219:96)
-    at async requestHandlerImpl (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\router-server.js:383:13)
-    at async Server.requestListener (D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\lib\start-server.js:143:13)
+ ✓ Ready in 4s
+ ○ Compiling /src/middleware ...
+ ✓ Compiled /src/middleware in 4s (130 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 23.3s (1597 modules)
+ GET / 200 in 24364ms
+ ✓ Compiled in 1169ms (712 modules)
+ ○ Compiling /login ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (107kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (258kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled /login in 11.8s (1598 modules)
+ GET /login 200 in 13088ms
+ ○ Compiling /forgot-password ...
+ ✓ Compiled /forgot-password in 998ms (1619 modules)
+ GET /forgot-password 200 in 1314ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 853ms (1622 modules)
+ GET /_next/undefined 404 in 1140ms
  ○ Compiling /_error ...
- ✓ Compiled /_error in 5.5s (255 modules)
-[?25h
+ ✓ Compiled /_error in 3.3s (1815 modules)
+ GET / 404 in 4310ms
+ GET / 200 in 817ms
+ GET /_next/static/css/app/layout.css?v=1786138904562 404 in 389ms
+ GET /_next/static/chunks/main-app.js?v=1786138904562 404 in 492ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 493ms
+ GET /_next/static/chunks/app/layout.js 404 in 500ms
+ GET /_next/static/chunks/app/page.js 404 in 459ms
+ GET /_next/static/chunks/app/loading.js 404 in 83ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 684ms (940 modules)
+ GET /favicon.ico 200 in 1398ms
+ GET / 404 in 18ms
+ GET /favicon.ico 404 in 26ms
+ GET / 404 in 20ms
+ GET / 404 in 14ms
+ GET / 404 in 14ms
+ GET / 404 in 15ms
+ GET / 404 in 16ms
+ GET / 404 in 16ms
+ GET / 404 in 15ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat 'D:\transfered folder\courses\projects\educenter\educenter-frontend\.next\server\app\favicon.ico'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/favicon.ico/route' in D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server for build dependencies doesn't lead to expected result 'D:\transfered folder\courses\projects\educenter\educenter-frontend\.next\server\app\favicon.ico\route.js', but to 'Error: Can't resolve '../../../../.next/server/app/favicon.ico/route' in 'D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/favicon.ico/route (expected D:\transfered folder\courses\projects\educenter\educenter-frontend\.next\server\app\favicon.ico\route.js)
+<w>  at file dependencies D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\require.js
+<w>  at file D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\require.js
+<w>  at file dependencies D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\load-components.js
+<w>  at file D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\load-components.js
+<w>  at file dependencies D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\utils.js
+<w>  at file D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\utils.js
+<w>  at file dependencies D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\webpack\loaders\next-route-loader\index.js
+<w>  at file D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\webpack\loaders\next-route-loader\index.js
+<w>  at resolve commonjs D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\webpack\loaders\next-route-loader\index.js
+ ✓ Compiled in 2.9s (920 modules)
+ ✓ Compiled in 1046ms (920 modules)
+ ✓ Compiled in 1142ms (920 modules)
+ ✓ Compiled in 1107ms (920 modules)
+ ✓ Compiled in 1146ms (920 modules)

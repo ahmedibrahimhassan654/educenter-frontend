@@ -72,6 +72,28 @@ interface Pagination {
   pages: number;
 }
 
+interface TeacherGroup {
+  _id: string;
+  title: string;
+  subject: string;
+  grade: string;
+  stage?: string;
+  scheduleDays: string[];
+  totalSessionPrice: number;
+  priceTeacherShare: number;
+  studentsCount: number;
+  createdAt: string;
+}
+
+interface TeacherGroupsSummary {
+  groups: TeacherGroup[];
+  stats: {
+    totalGroups: number;
+    totalStudents: number;
+    averageStudentsPerGroup: number;
+  };
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -96,6 +118,8 @@ export default function AdminUsersPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showViewModal, setShowViewModal] = useState<User | null>(null);
+  const [teacherGroups, setTeacherGroups] = useState<TeacherGroupsSummary | null>(null);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -209,6 +233,24 @@ export default function AdminUsersPage() {
       password: "",
     });
     setShowModal(true);
+  };
+
+  // Open the details modal, loading group data for teachers
+  const openViewModal = async (user: User) => {
+    setShowViewModal(user);
+    setTeacherGroups(null);
+
+    if (user.role !== "TEACHER") return;
+
+    setIsLoadingGroups(true);
+    try {
+      const response = await api.get(`/groups/teacher/${user._id}/summary`);
+      setTeacherGroups(response.data?.data || null);
+    } catch {
+      toast.error("تعذر تحميل بيانات المجموعات");
+    } finally {
+      setIsLoadingGroups(false);
+    }
   };
 
   // Open edit modal
@@ -525,7 +567,7 @@ export default function AdminUsersPage() {
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                onClick={() => setShowViewModal(user)}
+                                onClick={() => openViewModal(user)}
                                 title="عرض التفاصيل"
                               >
                                 <Eye className="w-4 h-4" />
@@ -789,6 +831,92 @@ export default function AdminUsersPage() {
                         {getVerificationBadge(showViewModal.verificationStatus).label}
                       </span>
                     </Badge>
+                  </div>
+
+                  {/* Groups */}
+                  <div className="p-2.5 bg-indigo-500/5 border border-indigo-500/20 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <BookOpen className="w-3 h-3 text-indigo-500" /> المجموعات
+                    </p>
+
+                    {isLoadingGroups ? (
+                      <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        جاري تحميل المجموعات...
+                      </div>
+                    ) : !teacherGroups || teacherGroups.stats.totalGroups === 0 ? (
+                      <p className="text-sm text-muted-foreground py-1">
+                        لم يقم هذا المعلم بإنشاء أي مجموعة بعد
+                      </p>
+                    ) : (
+                      <>
+                        {/* Summary counters */}
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                          <div className="text-center p-2 bg-background rounded-lg border">
+                            <p className="text-lg font-bold text-indigo-600">
+                              {teacherGroups.stats.totalGroups}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">مجموعة</p>
+                          </div>
+                          <div className="text-center p-2 bg-background rounded-lg border">
+                            <p className="text-lg font-bold text-green-600">
+                              {teacherGroups.stats.totalStudents}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">طالب</p>
+                          </div>
+                          <div className="text-center p-2 bg-background rounded-lg border">
+                            <p className="text-lg font-bold text-orange-600">
+                              {teacherGroups.stats.averageStudentsPerGroup}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">متوسط/مجموعة</p>
+                          </div>
+                        </div>
+
+                        {/* Per-group breakdown */}
+                        <div className="space-y-2">
+                          {teacherGroups.groups.map((group) => (
+                            <div
+                              key={group._id}
+                              className="p-2.5 bg-background rounded-lg border"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-sm truncate">
+                                    {group.title}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {group.subject}
+                                    {group.grade ? ` • ${group.grade}` : ""}
+                                  </p>
+                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className="bg-green-500/10 text-green-600 border-0 text-xs shrink-0"
+                                >
+                                  <span className="flex items-center gap-1">
+                                    <Users className="w-3 h-3" />
+                                    {group.studentsCount} طالب
+                                  </span>
+                                </Badge>
+                              </div>
+
+                              {group.scheduleDays?.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {group.scheduleDays.map((day, i) => (
+                                    <span
+                                      key={i}
+                                      className="px-1.5 py-0.5 bg-muted rounded text-[11px] text-muted-foreground"
+                                    >
+                                      {day}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Subjects */}
