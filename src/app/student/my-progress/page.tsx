@@ -1,6 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
+import { useAuth } from "@/components/auth-provider";
+import api from "@/lib/api";
 import {
   BookOpen,
   CheckCircle,
@@ -9,95 +12,92 @@ import {
   TrendingUp,
   Star,
   Download,
+  Loader2,
 } from "lucide-react";
 
-const groups = [
-  {
-    id: 1,
-    subject: "الفيزياء",
-    teacher: "أ. محمد الأحمد",
-    group: "الصف الثاني الثانوي",
-    attendance: [
-      { session: 1, date: "٠١ يناير", status: "present" },
-      { session: 2, date: "٠٣ يناير", status: "present" },
-      { session: 3, date: "٠٨ يناير", status: "absent" },
-      { session: 4, date: "١٠ يناير", status: "present" },
-      { session: 5, date: "١٥ يناير", status: "present" },
-      { session: 6, date: "١٧ يناير", status: "present" },
-      { session: 7, date: "٢٢ يناير", status: "upcoming" },
-      { session: 8, date: "٢٤ يناير", status: "upcoming" },
-    ],
-    homework: [
-      { name: "واجب ١", grade: "٩٥٪", status: "submitted" },
-      { name: "واجب ٢", grade: "٨٨٪", status: "submitted" },
-      { name: "واجب ٣", grade: "٩٢٪", status: "submitted" },
-      { name: "واجب ٤", grade: "--", status: "pending" },
-    ],
-    quizzes: [
-      { name: "اختبار ١", grade: "٩٠٪", status: "completed" },
-      { name: "اختبار ٢", grade: "٩٥٪", status: "completed" },
-    ],
-  },
-  {
-    id: 2,
-    subject: "الرياضيات",
-    teacher: "أ. فاطمة العلي",
-    group: "الصف الثاني الثانوي",
-    attendance: [
-      { session: 1, date: "٠٢ يناير", status: "present" },
-      { session: 2, date: "٠٤ يناير", status: "present" },
-      { session: 3, date: "٠٩ يناير", status: "present" },
-      { session: 4, date: "١١ يناير", status: "excused" },
-      { session: 5, date: "١٦ يناير", status: "present" },
-      { session: 6, date: "١٨ يناير", status: "upcoming" },
-      { session: 7, date: "٢٣ يناير", status: "upcoming" },
-      { session: 8, date: "٢٥ يناير", status: "upcoming" },
-    ],
-    homework: [
-      { name: "واجب ١", grade: "٨٥٪", status: "submitted" },
-      { name: "واجب ٢", grade: "٩٠٪", status: "submitted" },
-      { name: "واجب ٣", grade: "--", status: "pending" },
-    ],
-    quizzes: [
-      { name: "اختبار ١", grade: "٨٨٪", status: "completed" },
-    ],
-  },
-  {
-    id: 3,
-    subject: "الكيمياء",
-    teacher: "أ. خالد السعود",
-    group: "الصف الثاني الثانوي",
-    attendance: [
-      { session: 1, date: "٠٢ يناير", status: "present" },
-      { session: 2, date: "٠٥ يناير", status: "present" },
-      { session: 3, date: "٠٩ يناير", status: "present" },
-      { session: 4, date: "١٢ يناير", status: "present" },
-      { session: 5, date: "١٦ يناير", status: "absent" },
-      { session: 6, date: "١٩ يناير", status: "present" },
-      { session: 7, date: "٢٣ يناير", status: "upcoming" },
-      { session: 8, date: "٢٦ يناير", status: "upcoming" },
-    ],
-    homework: [
-      { name: "واجب ١", grade: "٩٢٪", status: "submitted" },
-      { name: "واجب ٢", grade: "٨٨٪", status: "submitted" },
-      { name: "واجب ٣", grade: "٩٥٪", status: "submitted" },
-      { name: "واجب ٤", grade: "٩٠٪", status: "submitted" },
-    ],
-    quizzes: [
-      { name: "اختبار ١", grade: "٩٢٪", status: "completed" },
-      { name: "اختبار ٢", grade: "٨٨٪", status: "completed" },
-    ],
-  },
-];
+interface Group {
+  _id: string;
+  title: string;
+  subject: string;
+  grade: string;
+  teacherId: { name: string; email: string };
+  students: any[];
+}
+
+interface Session {
+  _id: string;
+  title: string;
+  date: string;
+  status: string;
+  groupId: { _id: string; title: string; subject: string };
+}
+
+interface Attendance {
+  _id: string;
+  status: string;
+  studentId: string;
+  sessionId: string;
+}
 
 const statusColors: Record<string, { bg: string; text: string; icon: React.ElementType }> = {
-  present: { bg: "bg-green-500/10", text: "text-green-500", icon: CheckCircle },
-  absent: { bg: "bg-red-500/10", text: "text-red-500", icon: XCircle },
-  excused: { bg: "bg-yellow-500/10", text: "text-yellow-500", icon: Clock },
-  upcoming: { bg: "bg-gray-500/10", text: "text-gray-500", icon: Clock },
+  PRESENT: { bg: "bg-green-500/10", text: "text-green-500", icon: CheckCircle },
+  ABSENT: { bg: "bg-red-500/10", text: "text-red-500", icon: XCircle },
+  LATE: { bg: "bg-yellow-500/10", text: "text-yellow-500", icon: Clock },
+  SCHEDULED: { bg: "bg-gray-500/10", text: "text-gray-500", icon: Clock },
 };
 
 export default function StudentProgressPage() {
+  const { user } = useAuth();
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [groupsRes, sessionsRes] = await Promise.all([
+          api.get("/groups"),
+          api.get("/sessions"),
+        ]);
+        setGroups(groupsRes.data);
+        setSessions(sessionsRes.data);
+
+        // Fetch attendance summary if user exists
+        if (user?._id) {
+          try {
+            const summaryRes = await api.get(`/attendance/student/${user._id}/summary`);
+            setAttendanceSummary(summaryRes.data);
+          } catch {
+            // Attendance summary might not exist yet
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  const completedSessions = sessions.filter((s) => s.status === "COMPLETED");
+  const totalSessions = sessions.length;
+  const attendanceRate = totalSessions > 0
+    ? Math.round((completedSessions.length / totalSessions) * 100)
+    : 0;
+
+  if (loading) {
+    return (
+      <DashboardLayout role="student">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout role="student">
       <div className="space-y-8">
@@ -121,134 +121,111 @@ export default function StudentProgressPage() {
             <div className="w-12 h-12 mx-auto rounded-xl bg-green-500/10 flex items-center justify-center mb-3">
               <CheckCircle className="w-6 h-6 text-green-500" />
             </div>
-            <p className="text-3xl font-bold mb-1">٨٨٪</p>
+            <p className="text-3xl font-bold mb-1">{attendanceRate}٪</p>
             <p className="text-sm text-muted-foreground">نسبة الحضور</p>
           </div>
           <div className="bg-card border rounded-xl p-5 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
               <BookOpen className="w-6 h-6 text-blue-500" />
             </div>
-            <p className="text-3xl font-bold mb-1">١٥</p>
+            <p className="text-3xl font-bold mb-1">{completedSessions.length}</p>
             <p className="text-sm text-muted-foreground">حصص حضرتها</p>
           </div>
           <div className="bg-card border rounded-xl p-5 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-purple-500/10 flex items-center justify-center mb-3">
               <TrendingUp className="w-6 h-6 text-purple-500" />
             </div>
-            <p className="text-3xl font-bold mb-1">٩١٪</p>
-            <p className="text-sm text-muted-foreground">متوسط الدرجات</p>
+            <p className="text-3xl font-bold mb-1">
+              {attendanceSummary?.present || 0}
+            </p>
+            <p className="text-sm text-muted-foreground">حضور</p>
           </div>
           <div className="bg-card border rounded-xl p-5 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-yellow-500/10 flex items-center justify-center mb-3">
               <Star className="w-6 h-6 text-yellow-500" />
             </div>
-            <p className="text-3xl font-bold mb-1">١٠</p>
-            <p className="text-sm text-muted-foreground">واجبات مسلمة</p>
+            <p className="text-3xl font-bold mb-1">{groups.length}</p>
+            <p className="text-sm text-muted-foreground">مجموعات مسجلة</p>
           </div>
         </div>
 
         {/* Groups Progress */}
-        {groups.map((group) => (
-          <div key={group.id} className="bg-card border rounded-xl overflow-hidden">
-            {/* Group Header */}
-            <div className="p-6 border-b bg-muted/30">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h3 className="text-xl font-bold mb-1">{group.subject}</h3>
-                  <p className="text-base text-muted-foreground">
-                    {group.teacher} • {group.group}
-                  </p>
-                </div>
-                <div className="flex gap-4">
-                  <div className="text-center px-3 py-1 bg-green-500/10 rounded-lg">
-                    <p className="text-lg font-bold text-green-500">
-                      {group.attendance.filter((a) => a.status === "present").length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">حضور</p>
-                  </div>
-                  <div className="text-center px-3 py-1 bg-red-500/10 rounded-lg">
-                    <p className="text-lg font-bold text-red-500">
-                      {group.attendance.filter((a) => a.status === "absent").length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">غياب</p>
-                  </div>
-                  <div className="text-center px-3 py-1 bg-yellow-500/10 rounded-lg">
-                    <p className="text-lg font-bold text-yellow-500">
-                      {group.attendance.filter((a) => a.status === "excused").length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">معذور</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Attendance Grid */}
-            <div className="p-6">
-              <h4 className="text-lg font-semibold mb-4">سجل الحضور</h4>
-              <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
-                {group.attendance.map((session) => {
-                  const status = statusColors[session.status];
-                  const StatusIcon = status.icon;
-                  return (
-                    <div
-                      key={session.session}
-                      className={`${status.bg} rounded-lg p-3 text-center`}
-                    >
-                      <StatusIcon className={`w-5 h-5 mx-auto mb-1 ${status.text}`} />
-                      <p className="text-xs font-medium">الحصة {session.session}</p>
-                      <p className="text-xs text-muted-foreground">{session.date}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Homework & Quizzes */}
-            <div className="grid md:grid-cols-2 gap-6 p-6 border-t">
-              {/* Homework */}
-              <div>
-                <h4 className="text-lg font-semibold mb-4">الواجبات</h4>
-                <div className="space-y-3">
-                  {group.homework.map((hw, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                    >
-                      <span className="text-base">{hw.name}</span>
-                      {hw.status === "submitted" ? (
-                        <span className="px-3 py-1 bg-green-500/10 text-green-500 rounded-full text-sm font-medium">
-                          {hw.grade}
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 bg-yellow-500/10 text-yellow-500 rounded-full text-sm font-medium">
-                          معلق
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quizzes */}
-              <div>
-                <h4 className="text-lg font-semibold mb-4">الاختبارات</h4>
-                <div className="space-y-3">
-                  {group.quizzes.map((quiz, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                    >
-                      <span className="text-base">{quiz.name}</span>
-                      <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
-                        {quiz.grade}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+        {groups.length === 0 ? (
+          <div className="text-center py-16 bg-card border rounded-xl">
+            <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-bold mb-2">لم تنضم إلى أي مجموعة بعد</h3>
+            <p className="text-muted-foreground">انضم إلى مجموعة لبدء متابعة تقدمك</p>
           </div>
-        ))}
+        ) : (
+          groups.map((group) => {
+            const groupSessions = sessions.filter(
+              (s) => s.groupId._id === group._id
+            );
+            const completedGroupSessions = groupSessions.filter(
+              (s) => s.status === "COMPLETED"
+            );
+
+            return (
+              <div key={group._id} className="bg-card border rounded-xl overflow-hidden">
+                {/* Group Header */}
+                <div className="p-6 border-b bg-muted/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-bold mb-1">{group.title}</h3>
+                      <p className="text-base text-muted-foreground">
+                        {group.teacherId?.name || "غير محدد"} • {group.grade}
+                      </p>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="text-center px-3 py-1 bg-green-500/10 rounded-lg">
+                        <p className="text-lg font-bold text-green-500">
+                          {completedGroupSessions.length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">مكتملة</p>
+                      </div>
+                      <div className="text-center px-3 py-1 bg-blue-500/10 rounded-lg">
+                        <p className="text-lg font-bold text-blue-500">
+                          {groupSessions.length - completedGroupSessions.length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">متبقية</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sessions List */}
+                <div className="p-6">
+                  <h4 className="text-lg font-semibold mb-4">الحصص</h4>
+                  {groupSessions.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">لا توجد حصص بعد</p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {groupSessions.map((session, index) => {
+                        const status = statusColors[session.status] || statusColors.SCHEDULED;
+                        const StatusIcon = status.icon;
+                        return (
+                          <div
+                            key={session._id}
+                            className={`${status.bg} rounded-lg p-3 text-center`}
+                          >
+                            <StatusIcon className={`w-5 h-5 mx-auto mb-1 ${status.text}`} />
+                            <p className="text-xs font-medium">الحصة {index + 1}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.date).toLocaleDateString("ar-EG", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </DashboardLayout>
   );

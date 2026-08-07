@@ -43,6 +43,34 @@ async function getCachedSession() {
   return session;
 }
 
+// API Response Cache
+interface CacheEntry {
+  data: any;
+  expiry: number;
+}
+
+const responseCache = new Map<string, CacheEntry>();
+const CACHE_DURATION = 30 * 1000; // 30 seconds for GET requests
+const LONG_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for rarely changing data
+
+// Endpoints that can be cached longer
+const longCacheEndpoints = ["/curriculum", "/groups?explore=true"];
+
+function getCacheKey(config: any): string | null {
+  // Only cache GET requests
+  if (config.method !== "get") return null;
+  
+  const url = config.url || "";
+  const params = JSON.stringify(config.params || {});
+  return `${url}:${params}`;
+}
+
+function getCacheDuration(url: string): number {
+  return longCacheEndpoints.some(endpoint => url.includes(endpoint)) 
+    ? LONG_CACHE_DURATION 
+    : CACHE_DURATION;
+}
+
 // Add auth token to requests
 api.interceptors.request.use(async (config) => {
   const session = await getCachedSession();
@@ -51,17 +79,55 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${session.access_token}`;
   }
 
+  // Check cache for GET requests
+  const cacheKey = getCacheKey(config);
+  if (cacheKey) {
+    const cached = responseCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiry) {
+      // Return cached response
+      return Promise.reject({
+        __cached: true,
+        data: cached.data,
+        config,
+      });
+    }
+  }
+
   return config;
 });
 
 // Handle response errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Cache successful GET responses
+    const cacheKey = getCacheKey(response.config);
+    if (cacheKey) {
+      const duration = getCacheDuration(response.config.url || "");
+      responseCache.set(cacheKey, {
+        data: response.data,
+        expiry: Date.now() + duration,
+      });
+    }
+    return response;
+  },
   async (error) => {
+    // Handle cached responses
+    if (error.__cached) {
+      return Promise.resolve({
+        data: error.data,
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: error.config,
+      });
+    }
+
     if (error.response?.status === 401) {
       // Clear cached session on 401
       cachedSession = null;
       sessionExpiry = 0;
+      // Clear all response cache on auth error
+      responseCache.clear();
       
       const supabase = getSupabaseClient();
       const {
@@ -75,5 +141,19 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Helper to clear cache for specific endpoints
+export function clearCache(pattern?: string) {
+  if (!pattern) {
+    responseCache.clear();
+    return;
+  }
+  
+  for (const key of responseCache.keys()) {
+    if (key.includes(pattern)) {
+      responseCache.delete(key);
+    }
+  }
+}
 
 export default api;
