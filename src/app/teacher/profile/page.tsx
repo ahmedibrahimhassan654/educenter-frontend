@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import api from "@/lib/api";
+import notificationApi, { NotificationSettings } from "@/lib/notification-api";
 import { toast } from "sonner";
 import {
   User,
@@ -38,6 +39,7 @@ import {
   Award,
   FileText,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 
 export default function TeacherProfilePage() {
@@ -65,6 +67,8 @@ export default function TeacherProfilePage() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -80,6 +84,37 @@ export default function TeacherProfilePage() {
       setAvatarUrl((user as any).avatarUrl || null);
     }
   }, [user]);
+
+  // Fetch notification settings
+  useEffect(() => {
+    const fetchNotificationSettings = async () => {
+      try {
+        setIsLoadingSettings(true);
+        const settings = await notificationApi.getSettings();
+        setNotificationSettings(settings);
+      } catch (error) {
+        console.error("Error fetching notification settings:", error);
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    };
+    fetchNotificationSettings();
+  }, []);
+
+  // Update notification setting
+  const handleNotificationToggle = async (key: keyof NotificationSettings) => {
+    if (!notificationSettings) return;
+    
+    try {
+      const updated = await notificationApi.updateSettings({
+        [key]: !notificationSettings[key],
+      });
+      setNotificationSettings(updated);
+      toast.success("تم تحديث إعدادات الإشعارات");
+    } catch (error) {
+      toast.error("خطأ في تحديث إعدادات الإشعارات");
+    }
+  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -215,12 +250,14 @@ export default function TeacherProfilePage() {
     { id: 4, action: "تقييم الطلاب", detail: "تم تقييم ١٥ طالب في اختبار الفيزياء", time: "منذ يومين", icon: Award, color: "text-orange-500", bg: "bg-orange-500/10" },
   ];
 
-  const notifications = [
-    { id: 1, title: "إشعارات الحصص", description: "تذكيرات قبل موعد الحصص", enabled: true, icon: Calendar },
-    { id: 2, title: "إشعارات الطلاب", description: "عند تسجيل طالب جديد في مجموعتك", enabled: true, icon: Users },
-    { id: 3, title: "إشعارات المدفوعات", description: "عند إضافة رصيد جديد", enabled: true, icon: Wallet },
-    { id: 4, title: "إشعارات الواجبات", description: "عند تسليم طالب للواجب", enabled: false, icon: FileText },
-    { id: 5, title: "التقارير الأسبوعية", description: "ملخص أسبوعي لأداء مجموعاتك", enabled: true, icon: Activity },
+  // Teacher notification options
+  const teacherNotificationOptions = [
+    { key: "newStudent" as keyof NotificationSettings, title: "إشعارات الطلاب الجدد", description: "عند تسجيل طالب جديد في مجموعتك", icon: Users },
+    { key: "studentPayment" as keyof NotificationSettings, title: "إشعارات المدفوعات", description: "عند إضافة رصيد جديد", icon: Wallet },
+    { key: "sessionReminder" as keyof NotificationSettings, title: "تذكيرات الحصص", description: "تذكيرات قبل موعد الحصص", icon: Calendar },
+    { key: "sessionCancelled" as keyof NotificationSettings, title: "إلغاء الحصص", description: "عند إلغاء حصة مجدولة", icon: Calendar },
+    { key: "groupUpdate" as keyof NotificationSettings, title: "إشعارات المجموعات", description: "عند تعديل أو تحديث المجموعة", icon: BookOpen },
+    { key: "weeklyReport" as keyof NotificationSettings, title: "التقارير الأسبوعية", description: "ملخص أسبوعي لأداء مجموعاتك", icon: Activity },
   ];
 
   return (
@@ -712,32 +749,39 @@ export default function TeacherProfilePage() {
                     <p className="text-sm text-muted-foreground mt-1">تحكم في الإشعارات التي تتلقاها</p>
                   </div>
 
-                  <div className="space-y-3">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className="flex items-center justify-between p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                            <notification.icon className="w-5 h-5 text-green-600" />
+                  {isLoadingSettings ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-green-500" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {teacherNotificationOptions.map((option) => (
+                        <div
+                          key={option.key}
+                          className="flex items-center justify-between p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                              <option.icon className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{option.title}</p>
+                              <p className="text-sm text-muted-foreground">{option.description}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{notification.title}</p>
-                            <p className="text-sm text-muted-foreground">{notification.description}</p>
-                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={notificationSettings?.[option.key] ?? false}
+                              onChange={() => handleNotificationToggle(option.key)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-muted after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                          </label>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            defaultChecked={notification.enabled}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-muted after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

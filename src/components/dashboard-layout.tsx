@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { NotificationBell } from "@/components/notification-bell";
 
 interface SidebarLink {
   href: string;
@@ -35,6 +36,7 @@ const teacherLinks: SidebarLink[] = [
   { href: "/teacher", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/teacher/groups", label: "المجموعات", icon: Users },
   { href: "/teacher/earnings", label: "الأرباح", icon: Wallet },
+  { href: "/notifications", label: "الإشعارات", icon: Bell },
   { href: "/teacher/profile", label: "الملف الشخصي", icon: UserCircle },
 ];
 
@@ -42,12 +44,14 @@ const studentLinks: SidebarLink[] = [
   { href: "/student", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/student/explore", label: "استكشف المجموعات", icon: Search },
   { href: "/student/my-progress", label: "تقدمي", icon: BarChart3 },
+  { href: "/notifications", label: "الإشعارات", icon: Bell },
 ];
 
 const parentLinks: SidebarLink[] = [
   { href: "/parent", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/parent/payments", label: "المدفوعات", icon: Wallet },
   { href: "/parent/reports", label: "التقارير", icon: FileText },
+  { href: "/notifications", label: "الإشعارات", icon: Bell },
 ];
 
 const adminLinks: SidebarLink[] = [
@@ -56,6 +60,7 @@ const adminLinks: SidebarLink[] = [
   { href: "/admin/groups", label: "المجموعات", icon: BookOpen },
   { href: "/admin/curriculum", label: "المنهاج الدراسي", icon: School },
   { href: "/admin/payments", label: "المدفوعات", icon: Wallet },
+  { href: "/notifications", label: "الإشعارات", icon: Bell },
   { href: "/admin/profile", label: "الملف الشخصي", icon: UserCircle },
   { href: "/admin/settings", label: "الإعدادات", icon: Settings },
 ];
@@ -260,10 +265,7 @@ export default function DashboardLayout({
               </h1>
             </div>
             <div className="flex items-center gap-4">
-              <button className="relative p-2 hover:bg-muted rounded-lg">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 left-1 w-2 h-2 bg-red-500 rounded-full" />
-              </button>
+              <NotificationBell userId={(user as any)?._id || user?.id || ""} />
               <DynamicThemeToggle />
               <Link href={`/${role}/profile`} className="flex items-center gap-2">
                 {avatarUrl ? (

@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import api from "@/lib/api";
+import notificationApi, { NotificationSettings } from "@/lib/notification-api";
 import { toast } from "sonner";
 import {
   User,
@@ -34,6 +35,7 @@ import {
   Calendar,
   TrendingUp,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 
 export default function AdminProfilePage() {
@@ -57,6 +59,8 @@ export default function AdminProfilePage() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -68,6 +72,37 @@ export default function AdminProfilePage() {
       setAvatarUrl((user as any).avatarUrl || null);
     }
   }, [user]);
+
+  // Fetch notification settings
+  useEffect(() => {
+    const fetchNotificationSettings = async () => {
+      try {
+        setIsLoadingSettings(true);
+        const settings = await notificationApi.getSettings();
+        setNotificationSettings(settings);
+      } catch (error) {
+        console.error("Error fetching notification settings:", error);
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    };
+    fetchNotificationSettings();
+  }, []);
+
+  // Update notification setting
+  const handleNotificationToggle = async (key: keyof NotificationSettings) => {
+    if (!notificationSettings) return;
+    
+    try {
+      const updated = await notificationApi.updateSettings({
+        [key]: !notificationSettings[key],
+      });
+      setNotificationSettings(updated);
+      toast.success("تم تحديث إعدادات الإشعارات");
+    } catch (error) {
+      toast.error("خطأ في تحديث إعدادات الإشعارات");
+    }
+  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -283,42 +318,14 @@ export default function AdminProfilePage() {
     },
   ];
 
-  const notifications = [
-    {
-      id: 1,
-      title: "إشعارات المستخدمين الجدد",
-      description: "عند تسجيل مستخدم جديد في المنصة",
-      enabled: true,
-      icon: Users,
-    },
-    {
-      id: 2,
-      title: "إشعارات المدفوعات",
-      description: "عند إجراء عملية سحب أو دفع جديدة",
-      enabled: true,
-      icon: Wallet,
-    },
-    {
-      id: 3,
-      title: "إشعارات الشكاوى",
-      description: "عند تقديم شكوى جديدة من المستخدمين",
-      enabled: true,
-      icon: AlertCircle,
-    },
-    {
-      id: 4,
-      title: "التقارير الأسبوعية",
-      description: "ملخص أسبوعي لأداء المنصة",
-      enabled: false,
-      icon: Activity,
-    },
-    {
-      id: 5,
-      title: "إشعارات النظام",
-      description: "تحديثات الصيانة والSystemService",
-      enabled: true,
-      icon: Settings,
-    },
+  // Admin notification options
+  const adminNotificationOptions = [
+    { key: "newStudent" as keyof NotificationSettings, title: "إشعارات المستخدمين الجدد", description: "عند تسجيل مستخدم جديد في المنصة", icon: Users },
+    { key: "studentPayment" as keyof NotificationSettings, title: "إشعارات المدفوعات", description: "عند إجراء عملية سحب أو دفع جديدة", icon: Wallet },
+    { key: "sessionReminder" as keyof NotificationSettings, title: "إشعارات الحصص", description: "تذكيرات قبل مواعيد الحصص", icon: Calendar },
+    { key: "groupUpdate" as keyof NotificationSettings, title: "إشعارات المجموعات", description: "عند إنشاء أو تعديل مجموعة", icon: BookOpen },
+    { key: "systemUpdates" as keyof NotificationSettings, title: "إشعارات النظام", description: "تحديثات الصيانة والSystemService", icon: Settings },
+    { key: "weeklyReport" as keyof NotificationSettings, title: "التقارير الأسبوعية", description: "ملخص أسبوعي لأداء المنصة", icon: Activity },
   ];
 
   return (
@@ -828,36 +835,43 @@ export default function AdminProfilePage() {
                     </p>
                   </div>
 
-                  <div className="space-y-3">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className="flex items-center justify-between p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <notification.icon className="w-5 h-5 text-primary" />
+                  {isLoadingSettings ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {adminNotificationOptions.map((option) => (
+                        <div
+                          key={option.key}
+                          className="flex items-center justify-between p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <option.icon className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{option.title}</p>
+                              <p className="text-sm text-muted-foreground">{option.description}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{notification.title}</p>
-                            <p className="text-sm text-muted-foreground">{notification.description}</p>
-                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={notificationSettings?.[option.key] ?? false}
+                              onChange={() => handleNotificationToggle(option.key)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-muted after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                          </label>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            defaultChecked={notification.enabled}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-muted after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="mt-6 p-4 bg-primary/5 rounded-xl border border-primary/10">
                     <p className="text-sm text-muted-foreground">
-                      <strong className="text-foreground">ملاحظة:</strong> يمكنك تعديل إعدادات الإشعارات في أي time. بعض الإشعارات الأساسية مثل تنبيهات الأمان لا يمكن تعطيلها.
+                      <strong className="text-foreground">ملاحظة:</strong> يمكنك تعديل إعدادات الإشعارات في أي وقت. بعض الإشعارات الأساسية مثل تنبيهات الأمان لا يمكن تعطيلها.
                     </p>
                   </div>
                 </div>

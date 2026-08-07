@@ -85,6 +85,7 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showViewModal, setShowViewModal] = useState<User | null>(null);
 
   // Form state
@@ -93,6 +94,7 @@ export default function AdminUsersPage() {
     email: "",
     phone: "",
     role: "STUDENT" as string,
+    password: "",
   });
 
   // Fetch users with filters
@@ -156,6 +158,7 @@ export default function AdminUsersPage() {
       email: "",
       phone: "",
       role: "STUDENT",
+      password: "",
     });
     setShowModal(true);
   };
@@ -169,6 +172,7 @@ export default function AdminUsersPage() {
       email: user.email,
       phone: user.phone,
       role: user.role,
+      password: "",
     });
     setShowModal(true);
   };
@@ -183,14 +187,23 @@ export default function AdminUsersPage() {
     setIsSaving(true);
     try {
       if (modalMode === "add") {
-        await api.post("/users", formData);
-        toast.success("تم إضافة المستخدم بنجاح");
+        const response = await api.post("/users", formData);
+        const generatedPassword = response.data?.generatedPassword;
+        if (generatedPassword) {
+          toast.success("تم إضافة المستخدم بنجاح", {
+            description: `كلمة المرور: ${generatedPassword}`,
+            duration: 15000,
+          });
+        } else {
+          toast.success("تم إضافة المستخدم بنجاح");
+        }
       } else if (selectedUser) {
         await api.put(`/users/${selectedUser._id}`, formData);
         toast.success("تم تحديث المستخدم بنجاح");
       }
       await fetchUsers();
       await fetchStats();
+      setFormData({ name: "", email: "", phone: "", role: "STUDENT", password: "" });
       setShowModal(false);
     } catch (error: any) {
       const message = error.response?.data?.message || "خطأ في حفظ المستخدم";
@@ -202,6 +215,8 @@ export default function AdminUsersPage() {
 
   // Delete user
   const handleDelete = async (userId: string) => {
+    if (isDeleting) return;
+    setIsDeleting(true);
     try {
       await api.delete(`/users/${userId}`);
       toast.success("تم حذف المستخدم بنجاح");
@@ -210,6 +225,8 @@ export default function AdminUsersPage() {
       setShowDeleteConfirm(null);
     } catch (error: any) {
       toast.error(error.response?.data?.message || "خطأ في حذف المستخدم");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -561,6 +578,22 @@ export default function AdminUsersPage() {
                   <option value="ADMIN">مدير</option>
                 </select>
               </div>
+
+              {modalMode === "add" && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">كلمة المرور</label>
+                  <Input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="اتركها فارغة للتوليد التلقائي"
+                    dir="ltr"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    إذا تركتها فارغة سيتم توليد كلمة مرور تلقائياً وإرسالها بالبريد الإلكتروني
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 mt-6">
@@ -600,8 +633,10 @@ export default function AdminUsersPage() {
                 <Button
                   variant="destructive"
                   onClick={() => handleDelete(showDeleteConfirm)}
+                  disabled={isDeleting}
                   className="flex-1"
                 >
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
                   حذف
                 </Button>
               </div>
