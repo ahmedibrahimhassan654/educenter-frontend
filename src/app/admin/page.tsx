@@ -204,6 +204,13 @@ export default function AdminDashboard() {
 
         {/* Quick Actions */}
         <div className="grid md:grid-cols-4 gap-6">
+          <Link href="/admin/groups" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
+            <div className={`w-12 h-12 rounded-xl ${iconChip.learning} flex items-center justify-center mb-4`}>
+              <GraduationCap className={`w-6 h-6 ${iconColor.learning}`} />
+            </div>
+            <h4 className="text-lg font-semibold mb-2">المجموعات</h4>
+            <p className="text-sm text-muted-foreground">عرض جميع المجموعات على المنصة</p>
+          </Link>
           <Link href="/admin/users" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
             <div className={`w-12 h-12 rounded-xl ${iconChip.people} flex items-center justify-center mb-4`}>
               <Users className={`w-6 h-6 ${iconColor.people}`} />

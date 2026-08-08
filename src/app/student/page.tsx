@@ -50,11 +50,11 @@ export default function StudentDashboard() {
     const fetchData = async () => {
       try {
         const [groupsRes, sessionsRes] = await Promise.all([
-          api.get("/groups"),
-          api.get("/sessions"),
+          api.get("/groups?limit=20"),
+          api.get("/sessions?limit=20"),
         ]);
-        setGroups(groupsRes.data);
-        setSessions(sessionsRes.data);
+        setGroups(groupsRes.data?.data || groupsRes.data);
+        setSessions(sessionsRes.data?.data || sessionsRes.data);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {

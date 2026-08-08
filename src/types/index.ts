@@ -28,7 +28,8 @@ export interface User {
 }
 
 export interface Group {
-  id: string;
+  id?: string;
+  _id?: string;
   teacherId: string | {
     _id: string;
     id: string;
@@ -51,6 +52,7 @@ export interface Group {
   platformFee: number;
   totalSessionPrice: number;
   maxStudentsPerGroup: number;
+  studentsCount?: number;
   googleMeetLink: string;
   scheduleDays: string[];
   students: string[];
@@ -59,8 +61,9 @@ export interface Group {
 }
 
 export interface Session {
-  id: string;
-  groupId: string;
+  id?: string;
+  _id?: string;
+  groupId: string | { _id: string; title: string; subject: string; };
   teacherId: string;
   title: string;
   date: string;

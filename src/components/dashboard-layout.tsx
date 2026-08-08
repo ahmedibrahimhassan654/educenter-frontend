@@ -71,6 +71,7 @@ const adminLinks: SidebarLink[] = [
   { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
   { href: "/admin/users", label: "المستخدمين", icon: Users, color: "people" },
   { href: "/admin/verifications", label: "طلبات التحقق", icon: Shield, color: "security" },
+  { href: "/admin/groups", label: "المجموعات", icon: GraduationCap, color: "learning" },
   { href: "/admin/settings", label: "إعدادات المنصة", icon: Settings, color: "neutral" },
   { href: "/admin/curriculum", label: "المنهاج الدراسي", icon: School, color: "learning" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },

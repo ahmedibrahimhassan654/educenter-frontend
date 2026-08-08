@@ -27,10 +27,17 @@ export default function GroupDetailPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
+  const [curriculumTree, setCurriculumTree] = useState<any[]>([]);
+  const [platformSettings, setPlatformSettings] = useState({
+    defaultPricePerLecture: 60,
+    maxStudentsPerGroup: 25,
+    platformFeePercentage: 15,
+  });
 
   const groupId = params.groupId as string;
 
   const fetchGroup = async () => {
+    if (!groupId) return;
     try {
       const response = await api.get(`/groups/${groupId}`);
       setGroup(response.data);
@@ -43,8 +50,69 @@ export default function GroupDetailPage() {
   };
 
   useEffect(() => {
-    fetchGroup();
+    if (groupId) {
+      fetchGroup();
+    }
+    // Fetch curriculum tree from admin settings
+    const fetchCurriculum = async () => {
+      try {
+        const res = await api.get("/curriculum");
+        setCurriculumTree(res.data || []);
+      } catch {
+        // ignore
+      }
+    };
+    fetchCurriculum();
+    // Fetch platform settings
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get("/settings/public");
+        if (res.data) {
+          setPlatformSettings(res.data);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchSettings();
   }, [groupId]);
+
+  // Build curriculum map from admin settings
+  const curriculumMap = new Map<string, { stage: string; grade: string; subject: string }>();
+  for (const stage of curriculumTree) {
+    for (const grade of stage.grades || []) {
+      for (const subject of grade.subjects || []) {
+        curriculumMap.set(subject.code, {
+          stage: stage.name,
+          grade: grade.name,
+          subject: subject.name,
+        });
+      }
+    }
+  }
+
+  // Parse teacher's curriculum using admin data
+  const teacherCurriculum = ((group?.teacherId as any)?.verificationData?.curriculum || []) as string[];
+  const parsedCurriculum = teacherCurriculum
+    .map((entry: string) => {
+      const separatorIndex = entry.indexOf(":");
+      const key = separatorIndex !== -1 ? entry.slice(0, separatorIndex) : entry;
+      const parts = key.split("-").filter(Boolean);
+      const codeIndex = parts.findIndex((p: string) => /^[A-Z]{2,}(_[A-Z0-9]+)+$/.test(p));
+      if (codeIndex === -1) return null;
+      const code = parts[codeIndex];
+      const info = curriculumMap.get(code);
+      return info ? { code, ...info } : null;
+    })
+    .filter(Boolean) as Array<{ code: string; stage: string; grade: string; subject: string }>;
+
+  // Group by stage → grade
+  const curriculumByStage = parsedCurriculum.reduce((acc, item) => {
+    if (!acc[item.stage]) acc[item.stage] = {};
+    if (!acc[item.stage][item.grade]) acc[item.stage][item.grade] = [];
+    acc[item.stage][item.grade].push(item.subject);
+    return acc;
+  }, {} as Record<string, Record<string, string[]>>);
 
   const handleRemoveStudent = async (studentId: string) => {
     if (!confirm("هل أنت متأكد من إزالة هذا الطالب من المجموعة؟")) return;
@@ -108,19 +176,28 @@ export default function GroupDetailPage() {
               <p className="text-base text-muted-foreground mt-1">
                 {group.subject} • {group.stage || (group.grade.includes("إعدادي") ? "الإعدادي" : group.grade.includes("الثانوي") ? "الثانوي" : "الابتدائي")} • {group.grade}
               </p>
-              {(group.teacherId as any)?.verificationData?.curriculum && (group.teacherId as any).verificationData.curriculum.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {(group.teacherId as any).verificationData.curriculum.map((entry: string, i: number) => {
-                    const [key, subjectName] = entry.split(":");
-                    const parts = key ? key.split("-") : [];
-                    const stage = parts[0] || "";
-                    const grade = parts.slice(1).join("-");
-                    return (
-                      <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs">
-                        {subjectName} <span className="text-muted-foreground">({stage} - {grade})</span>
-                      </span>
-                    );
-                  })}
+              {Object.keys(curriculumByStage).length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">المناهج المعتمدة من المنصة:</p>
+                  {Object.entries(curriculumByStage).map(([stage, grades]) => (
+                    <div key={stage} className="p-2 bg-muted/30 rounded-lg">
+                      <p className="text-xs font-semibold text-foreground">{stage}</p>
+                      <div className="mt-1 space-y-1">
+                        {Object.entries(grades).map(([grade, subjects]) => (
+                          <div key={grade} className="flex flex-wrap items-center gap-1">
+                            <span className="text-xs text-muted-foreground min-w-[100px]">{grade}</span>
+                            <div className="flex flex-wrap gap-1">
+                              {subjects.map((subject, si) => (
+                                <span key={si} className="px-2 py-0.5 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs">
+                                  {subject}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -153,15 +230,15 @@ export default function GroupDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">الطلاب المسجلين</p>
-                <p className="text-2xl font-bold">{group.students.length}/20</p>
+                <p className="text-2xl font-bold">{group.students.length}/{group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}</p>
               </div>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden mt-4">
               <div
                 className={`h-full rounded-full ${
-                  group.students.length >= 20 ? "bg-green-500" : "bg-primary"
+                  group.students.length >= (group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup) ? "bg-green-500" : "bg-primary"
                 }`}
-                style={{ width: `${(group.students.length / 20) * 100}%` }}
+                style={{ width: `${Math.min((group.students.length / (group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup)) * 100, 100)}%` }}
               />
             </div>
             {group.students.length > 0 && (
@@ -176,11 +253,11 @@ export default function GroupDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">سعر الحصة</p>
-                <p className="text-2xl font-bold text-green-500">{group.totalSessionPrice} ج.م</p>
+                <p className="text-2xl font-bold text-green-500">{group.totalSessionPrice || platformSettings.defaultPricePerLecture} ج.م</p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              حصة الطالب: {group.priceTeacherShare} ج.م • عمولة: {group.platformFee}%
+              حصة المعلم: {group.priceTeacherShare || (platformSettings.defaultPricePerLecture - Math.round(platformSettings.defaultPricePerLecture * platformSettings.platformFeePercentage / 100))} ج.م
             </p>
           </div>
 
@@ -205,18 +282,12 @@ export default function GroupDetailPage() {
                 <Settings className="w-5 h-5 text-orange-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">حالة التعديل</p>
-                <p className="text-2xl font-bold">
-                  {canModify ? (
-                    <span className="text-green-500">مفتوح</span>
-                  ) : (
-                    <span className="text-amber-500">مقفل</span>
-                  )}
-                </p>
+                <p className="text-sm text-muted-foreground">عمولة المنصة</p>
+                <p className="text-2xl font-bold">{platformSettings.platformFeePercentage}%</p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {canModify ? "يمكن التعديل والحذف" : "يوجد طلاب - لا يمكن التعديل"}
+              مطبقة على جميع الحصص
             </p>
           </div>
         </div>

@@ -88,6 +88,9 @@ export default function TeacherGroupsPage() {
   const { user } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStage, setSelectedStage] = useState("الكل");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -126,20 +129,36 @@ export default function TeacherGroupsPage() {
     }
   }, []);
 
-  const fetchGroups = useCallback(async () => {
+  const fetchGroups = useCallback(async (pageNum = 1, append = false) => {
     try {
-      const response = await api.get("/groups");
-      setGroups(response.data);
+      if (pageNum === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      const response = await api.get(`/groups?page=${pageNum}&limit=20`);
+      const newData = response.data?.data || response.data;
+      const pagination = response.data?.pagination;
+      
+      if (append) {
+        setGroups((prev) => [...prev, ...newData]);
+      } else {
+        setGroups(newData);
+      }
+      
+      setHasMore(pagination ? pageNum < pagination.pages : false);
+      setPage(pageNum);
     } catch (error) {
       console.error("Error fetching groups:", error);
       toast.error("فشل في تحميل المجموعات");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchGroups();
+    fetchGroups(1);
     fetchSettings();
     fetchTeacherCurriculum();
   }, [fetchGroups, fetchSettings, fetchTeacherCurriculum]);
@@ -292,7 +311,7 @@ export default function TeacherGroupsPage() {
         });
         toast.success("تم تحديث المجموعة بنجاح");
       } else {
-        await api.post("/groups", {
+        const newGroup = await api.post("/groups", {
           title: formData.title,
           subject: formData.subject,
           grade: formData.grade,
@@ -301,13 +320,19 @@ export default function TeacherGroupsPage() {
           scheduleDays,
         });
         toast.success("تم إنشاء المجموعة بنجاح");
+        // Optimistic update: add to list immediately
+        const createdGroup = newGroup.data;
+        if (createdGroup) {
+          setGroups((prev) => [createdGroup, ...prev]);
+        }
       }
 
       setShowCreateModal(false);
       setShowEditModal(false);
       setEditingGroup(null);
       resetForm();
-      fetchGroups();
+      // Refresh from server to ensure consistency
+      fetchGroups(1);
     } catch (error: any) {
       const message = error.response?.data?.message || (editingGroup ? "فشل في تحديث المجموعة" : "فشل في إنشاء المجموعة");
       toast.error(message);
@@ -320,7 +345,7 @@ export default function TeacherGroupsPage() {
     const group = groups.find((g) => g.id === groupId);
     if (!group) return;
 
-    if (group.students.length > 0) {
+    if ((group.studentsCount || 0) > 0) {
       toast.error("لا يمكن حذف المجموعة لأن بها طلاب مسجلين");
       return;
     }
@@ -330,7 +355,7 @@ export default function TeacherGroupsPage() {
     setDeletingId(groupId);
     try {
       await api.delete(`/groups/${groupId}`);
-      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+      setGroups((prev) => prev.filter((g) => (g._id || g.id) !== groupId));
       toast.success("تم حذف المجموعة بنجاح");
     } catch (error: any) {
       const message = error.response?.data?.message || "فشل في حذف المجموعة";
@@ -341,7 +366,7 @@ export default function TeacherGroupsPage() {
   };
 
   const canModify = (group: Group): boolean => {
-    return group.students.length === 0;
+    return (group.studentsCount || 0) === 0;
   };
 
   const platformFeeAmount = Math.round(
@@ -349,7 +374,7 @@ export default function TeacherGroupsPage() {
   );
   const teacherShare = settings.defaultPricePerLecture - platformFeeAmount;
 
-  const totalStudents = groups.reduce((sum, g) => sum + g.students.length, 0);
+  const totalStudents = groups.reduce((sum, g) => sum + (g.studentsCount || 0), 0);
   const totalCapacity = groups.reduce((sum, g) => sum + (g.maxStudentsPerGroup || settings.maxStudentsPerGroup), 0);
 
   if (loading) {
@@ -633,12 +658,12 @@ export default function TeacherGroupsPage() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredGroups.map((group) => {
           const maxStudents = group.maxStudentsPerGroup || settings.maxStudentsPerGroup;
-          const enrollmentPercent = Math.round((group.students.length / maxStudents) * 100);
-          const isFull = group.students.length >= maxStudents;
+          const enrollmentPercent = Math.round(((group.studentsCount || 0) / maxStudents) * 100);
+          const isFull = (group.studentsCount || 0) >= maxStudents;
 
           return (
             <div
-              key={group.id}
+              key={group._id || group.id}
               className="bg-card border rounded-2xl hover:shadow-lg transition-all duration-200 flex flex-col overflow-hidden"
             >
               <div className="p-5 pb-4">
@@ -663,12 +688,12 @@ export default function TeacherGroupsPage() {
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(group.id)}
-                      disabled={!canModify(group) || deletingId === group.id}
+                      onClick={() => handleDelete((group._id || group.id)!)}
+                      disabled={!canModify(group) || deletingId === (group._id || group.id)!}
                       className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed text-muted-foreground transition-colors"
                       title={canModify(group) ? "حذف" : "لا يمكن الحذف"}
                     >
-                      {deletingId === group.id ? (
+                      {deletingId === (group._id || group.id)! ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <Trash2 className="w-4 h-4" />
@@ -683,7 +708,7 @@ export default function TeacherGroupsPage() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-muted-foreground">الطلاب المسجلين</span>
                     <span className={`text-sm font-bold ${isFull ? "text-green-500" : "text-foreground"}`}>
-                      {group.students.length}/{maxStudents}
+                      {(group.studentsCount || 0)}/{maxStudents}
                     </span>
                   </div>
                   <div className="h-2.5 bg-muted rounded-full overflow-hidden">
@@ -725,7 +750,7 @@ export default function TeacherGroupsPage() {
 
                 <div className="mt-auto pt-4 border-t">
                   <Link
-                    href={`/teacher/groups/${group.id}`}
+                    href={`/teacher/groups/${group._id || group.id}`}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
                   >
                     <Eye className="w-4 h-4" />
@@ -737,6 +762,25 @@ export default function TeacherGroupsPage() {
           );
         })}
       </div>
+
+      {/* Load More */}
+      {hasMore && filteredGroups.length > 0 && (
+        <div className="flex justify-center pt-6">
+          <Button
+            onClick={() => fetchGroups(page + 1, true)}
+            disabled={loadingMore}
+            variant="outline"
+            className="gap-2"
+          >
+            {loadingMore ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
+            {loadingMore ? "جاري التحميل..." : "تحميل المزيد"}
+          </Button>
+        </div>
+      )}
 
       {/* Empty State */}
       {filteredGroups.length === 0 && (

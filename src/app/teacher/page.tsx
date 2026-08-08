@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
+import { Group, Session } from "@/types";
 import { iconColor } from "@/lib/icon-styles";
 import {
   Users,
@@ -18,38 +19,26 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-interface Group {
-  _id: string;
-  title: string;
-  subject: string;
-  grade: string;
-  students: any[];
-  totalSessionPrice?: number;
-}
-
-interface Session {
-  _id: string;
-  title: string;
-  date: string;
-  status: string;
-  groupId: { title: string; subject: string };
-}
-
 export default function TeacherDashboard() {
   const { user } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [stats, setStats] = useState({ totalGroups: 0, totalStudents: 0, totalEarnings: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [groupsRes, sessionsRes] = await Promise.all([
-          api.get("/groups"),
-          api.get("/sessions"),
+        const [groupsRes, sessionsRes, statsRes] = await Promise.all([
+          api.get("/groups?limit=20"),
+          api.get("/sessions?limit=10"),
+          api.get("/groups/stats"),
         ]);
-        setGroups(groupsRes.data);
-        setSessions(sessionsRes.data);
+        setGroups(groupsRes.data?.data || groupsRes.data);
+        setSessions(sessionsRes.data?.data || sessionsRes.data);
+        if (statsRes.data?.success) {
+          setStats(statsRes.data.data);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -65,8 +54,8 @@ export default function TeacherDashboard() {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 3);
 
-  const totalStudents = groups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
-  const totalEarnings = groups.reduce((acc, g) => acc + (g.totalSessionPrice || 0) * (g.students?.length || 0), 0);
+  const totalStudents = stats.totalStudents;
+  const totalEarnings = stats.totalEarnings;
 
   if (loading) {
     return (
@@ -199,7 +188,7 @@ export default function TeacherDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-base font-medium text-foreground truncate">
-                      {session.groupId?.title || session.title}
+                      {typeof session.groupId === "object" ? session.groupId?.title : session.title}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(session.date).toLocaleDateString("ar-EG", {
@@ -240,7 +229,7 @@ export default function TeacherDashboard() {
                   <h4 className="font-semibold mb-2">{group.title}</h4>
                   <p className="text-sm text-muted-foreground mb-3">{group.subject} • {group.grade}</p>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">{group.students?.length || 0} طالب</span>
+                     <span className="text-sm">{group.studentsCount || 0} طالب</span>
                     <Link
                       href={`/teacher/groups/${group._id}/attendance`}
                       className="text-sm text-primary hover:underline"

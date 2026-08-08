@@ -51,10 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!skipAuthCheck) {
           const supabase = createClient();
-          const {
-            data: { user: authUser },
-          } = await supabase.auth.getUser();
-          hasSession = !!authUser;
+          const { data, error } = await supabase.auth.getUser();
+          if (error) {
+            console.error("Supabase getUser error:", error.message, error);
+          }
+          hasSession = !!data.user;
         }
 
         if (hasSession) {
@@ -67,7 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             userCacheExpiry = Date.now() + USER_CACHE_DURATION;
 
             setUser(userData);
-          } catch {
+          } catch (apiError: any) {
+            console.error("API /auth/me error:", apiError?.response?.data || apiError?.message || apiError);
             setUser(null);
             cachedUser = null;
           }
@@ -75,7 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           cachedUser = null;
         }
-      } catch {
+      } catch (err: any) {
+        console.error("fetchUser outer catch:", err?.message || err);
         setUser(null);
         cachedUser = null;
       } finally {
