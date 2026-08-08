@@ -10,58 +10,28 @@
  ✓ Starting...
  ✓ Ready in 4s
  ○ Compiling /src/middleware ...
- ✓ Compiled /src/middleware in 4s (130 modules)
- ○ Compiling / ...
- ✓ Compiled / in 23.3s (1597 modules)
- GET / 200 in 24364ms
- ✓ Compiled in 1169ms (712 modules)
- ○ Compiling /login ...
+ ✓ Compiled /src/middleware in 1926ms (130 modules)
 <w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (107kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
 <w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (258kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
- ✓ Compiled /login in 11.8s (1598 modules)
- GET /login 200 in 13088ms
+ ○ Compiling / ...
+ ✓ Compiled / in 23.3s (1726 modules)
+ GET / 200 in 24348ms
+ ✓ Compiled in 1129ms (712 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 8.7s (1727 modules)
+ GET /login 200 in 9906ms
  ○ Compiling /forgot-password ...
- ✓ Compiled /forgot-password in 998ms (1619 modules)
- GET /forgot-password 200 in 1314ms
- ○ Compiling /_not-found ...
- ✓ Compiled /_not-found in 853ms (1622 modules)
- GET /_next/undefined 404 in 1140ms
- ○ Compiling /_error ...
- ✓ Compiled /_error in 3.3s (1815 modules)
- GET / 404 in 4310ms
- GET / 200 in 817ms
- GET /_next/static/css/app/layout.css?v=1786138904562 404 in 389ms
- GET /_next/static/chunks/main-app.js?v=1786138904562 404 in 492ms
- GET /_next/static/chunks/app-pages-internals.js 404 in 493ms
- GET /_next/static/chunks/app/layout.js 404 in 500ms
- GET /_next/static/chunks/app/page.js 404 in 459ms
- GET /_next/static/chunks/app/loading.js 404 in 83ms
- ○ Compiling /favicon.ico ...
- ✓ Compiled /favicon.ico in 684ms (940 modules)
- GET /favicon.ico 200 in 1398ms
- GET / 404 in 18ms
- GET /favicon.ico 404 in 26ms
- GET / 404 in 20ms
- GET / 404 in 14ms
- GET / 404 in 14ms
- GET / 404 in 15ms
- GET / 404 in 16ms
- GET / 404 in 16ms
- GET / 404 in 15ms
-<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat 'D:\transfered folder\courses\projects\educenter\educenter-frontend\.next\server\app\favicon.ico'
-<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/favicon.ico/route' in D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server for build dependencies doesn't lead to expected result 'D:\transfered folder\courses\projects\educenter\educenter-frontend\.next\server\app\favicon.ico\route.js', but to 'Error: Can't resolve '../../../../.next/server/app/favicon.ico/route' in 'D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server'' instead. Resolving dependencies are ignored for this path.
-<w>  at resolve commonjs file ../../../../.next/server/app/favicon.ico/route (expected D:\transfered folder\courses\projects\educenter\educenter-frontend\.next\server\app\favicon.ico\route.js)
-<w>  at file dependencies D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\require.js
-<w>  at file D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\require.js
-<w>  at file dependencies D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\load-components.js
-<w>  at file D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\server\load-components.js
-<w>  at file dependencies D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\utils.js
-<w>  at file D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\utils.js
-<w>  at file dependencies D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\webpack\loaders\next-route-loader\index.js
-<w>  at file D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\webpack\loaders\next-route-loader\index.js
-<w>  at resolve commonjs D:\transfered folder\courses\projects\educenter\educenter-frontend\node_modules\next\dist\build\webpack\loaders\next-route-loader\index.js
- ✓ Compiled in 2.9s (920 modules)
- ✓ Compiled in 1046ms (920 modules)
- ✓ Compiled in 1142ms (920 modules)
- ✓ Compiled in 1107ms (920 modules)
- ✓ Compiled in 1146ms (920 modules)
+ ✓ Compiled /forgot-password in 1053ms (1748 modules)
+ GET /forgot-password 200 in 1345ms
+ GET / 200 in 268ms
+ ✓ Compiled in 72ms
+ ✓ Compiled in 2s (735 modules)
+ ✓ Compiled in 1528ms (735 modules)
+ ✓ Compiled in 1335ms (735 modules)
+ ✓ Compiled in 1020ms (735 modules)
+ ✓ Compiled in 1035ms (735 modules)
+ ✓ Compiled in 1175ms (735 modules)
+ ✓ Compiled in 1963ms (735 modules)
+ ✓ Compiled in 1382ms (735 modules)
+ ✓ Compiled in 1273ms (735 modules)
+ ✓ Compiled in 1270ms (735 modules)

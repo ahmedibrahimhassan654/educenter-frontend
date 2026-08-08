@@ -4,17 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
+import { iconChip, iconColor } from "@/lib/icon-styles";
 import {
   Users,
   GraduationCap,
   BookOpen,
-  Wallet,
-  TrendingUp,
-  Calendar,
   ArrowLeft,
-  CheckCircle,
-  Clock,
   Loader2,
+  UserCircle,
+  Bell,
 } from "lucide-react";
 
 interface UserStats {
@@ -117,7 +115,7 @@ export default function AdminDashboard() {
           <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-500" />
+                <Users className={`w-6 h-6 ${iconColor.people}`} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">إجمالي المستخدمين</p>
@@ -126,7 +124,7 @@ export default function AdminDashboard() {
           <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-green-500" />
+                <GraduationCap className={`w-6 h-6 ${iconColor.learning}`} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">المعلمين</p>
@@ -135,7 +133,7 @@ export default function AdminDashboard() {
           <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-purple-500" />
+                <BookOpen className={`w-6 h-6 ${iconColor.learning}`} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">الطلاب</p>
@@ -144,7 +142,7 @@ export default function AdminDashboard() {
           <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-orange-500" />
+                <Users className={`w-6 h-6 ${iconColor.people}`} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">أولياء الأمور</p>
@@ -206,29 +204,29 @@ export default function AdminDashboard() {
         {/* Quick Actions */}
         <div className="grid md:grid-cols-4 gap-6">
           <Link href="/admin/users" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4">
-              <Users className="w-6 h-6 text-blue-500" />
+            <div className={`w-12 h-12 rounded-xl ${iconChip.people} flex items-center justify-center mb-4`}>
+              <Users className={`w-6 h-6 ${iconColor.people}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">إدارة المستخدمين</h4>
             <p className="text-sm text-muted-foreground">عرض وإدارة جميع المستخدمين</p>
           </Link>
           <Link href="/admin/curriculum" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
-            <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mb-4">
-              <BookOpen className="w-6 h-6 text-green-500" />
+            <div className={`w-12 h-12 rounded-xl ${iconChip.learning} flex items-center justify-center mb-4`}>
+              <BookOpen className={`w-6 h-6 ${iconColor.learning}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">المنهج الدراسي</h4>
             <p className="text-sm text-muted-foreground">إدارة المراحل والمواد</p>
           </Link>
           <Link href="/admin/profile" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
-            <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
-              <Wallet className="w-6 h-6 text-purple-500" />
+            <div className={`w-12 h-12 rounded-xl ${iconChip.neutral} flex items-center justify-center mb-4`}>
+              <UserCircle className={`w-6 h-6 ${iconColor.neutral}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">الملف الشخصي</h4>
             <p className="text-sm text-muted-foreground">تعديل بياناتك الشخصية</p>
           </Link>
           <Link href="/notifications" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
-            <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-4">
-              <Calendar className="w-6 h-6 text-orange-500" />
+            <div className={`w-12 h-12 rounded-xl ${iconChip.alert} flex items-center justify-center mb-4`}>
+              <Bell className={`w-6 h-6 ${iconColor.alert}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">الإشعارات</h4>
             <p className="text-sm text-muted-foreground">عرض جميع الإشعارات</p>

@@ -4,13 +4,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
+import { iconColor } from "@/lib/icon-styles";
 import {
   Users,
   Wallet,
   Calendar,
   ArrowLeft,
   Clock,
-  CheckCircle,
   BookOpen,
   Loader2,
   Shield,
@@ -85,7 +85,7 @@ export default function TeacherDashboard() {
         {user?.verificationStatus === "SUBMITTED" && (
           <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4">
             <div className="flex items-start gap-3">
-              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <Clock className={`w-5 h-5 ${iconColor.schedule} mt-0.5`} />
               <div className="flex-1">
                 <h3 className="font-semibold text-blue-800 dark:text-blue-300">طلبك قيد المراجعة</h3>
                 <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
@@ -99,7 +99,7 @@ export default function TeacherDashboard() {
         {user?.verificationStatus === "REJECTED" && (
           <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4">
             <div className="flex items-start gap-3">
-              <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+              <XCircle className={`w-5 h-5 ${iconColor.danger} mt-0.5`} />
               <div className="flex-1">
                 <h3 className="font-semibold text-red-800 dark:text-red-300">تم رفض طلب التحقق</h3>
                 <p className="text-sm text-red-700 dark:text-red-400 mt-1">
@@ -138,7 +138,7 @@ export default function TeacherDashboard() {
           <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-500" />
+                <Users className={`w-6 h-6 ${iconColor.people}`} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">إجمالي المجموعات</p>
@@ -147,7 +147,7 @@ export default function TeacherDashboard() {
           <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-green-500" />
+                <BookOpen className={`w-6 h-6 ${iconColor.learning}`} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">إجمالي الطلاب</p>
@@ -156,7 +156,7 @@ export default function TeacherDashboard() {
           <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                <Wallet className="w-6 h-6 text-purple-500" />
+                <Wallet className={`w-6 h-6 ${iconColor.money}`} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">صافي الأرباح</p>
@@ -165,7 +165,7 @@ export default function TeacherDashboard() {
           <div className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-orange-500" />
+                <Calendar className={`w-6 h-6 ${iconColor.schedule}`} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">الحصص القادمة</p>
@@ -261,7 +261,7 @@ export default function TeacherDashboard() {
             className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1"
           >
             <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4">
-              <Users className="w-6 h-6 text-blue-500" />
+              <Users className={`w-6 h-6 ${iconColor.people}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">إدارة المجموعات</h4>
             <p className="text-sm text-muted-foreground">إنشاء ومجموعاتك وإدارة الطلاب</p>
@@ -271,7 +271,7 @@ export default function TeacherDashboard() {
             className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1"
           >
             <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mb-4">
-              <Wallet className="w-6 h-6 text-green-500" />
+              <Wallet className={`w-6 h-6 ${iconColor.money}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">الأرباح والمدفوعات</h4>
             <p className="text-sm text-muted-foreground">متابعة أرباحك وطلب السحب</p>
@@ -281,7 +281,7 @@ export default function TeacherDashboard() {
             className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1"
           >
             <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
-              <Calendar className="w-6 h-6 text-purple-500" />
+              <Calendar className={`w-6 h-6 ${iconColor.schedule}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">الملف الشخصي</h4>
             <p className="text-sm text-muted-foreground">تعديل بياناتك الشخصية</p>

@@ -9,8 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import api from "@/lib/api";
+import { getErrorMessage } from "@/lib/utils";
+import { iconColor } from "@/lib/icon-styles";
 import notificationApi, { NotificationSettings } from "@/lib/notification-api";
 import { toast } from "sonner";
+import { streamChat } from "@/lib/ai-api";
 import {
   User,
   Mail,
@@ -28,19 +31,87 @@ import {
   Eye,
   EyeOff,
   ChevronLeft,
-  Settings,
   LogOut,
   Calendar,
-  TrendingUp,
   GraduationCap,
   Star,
   Users,
   Award,
   FileText,
+  Image as ImageIcon,
   Sparkles,
   Loader2,
   Shield,
 } from "lucide-react";
+
+// Labels for the documents, in the same order they are uploaded on the
+// verification form.
+const documentTypeLabels = [
+  "البطاقة الشخصية / الرقم القومي",
+  "شهادة التخرج",
+  "شهادات أخرى",
+];
+
+// Internal subject codes look like AR_SEC_3 / MATH_PREP_1
+const SUBJECT_CODE = /^[A-Z]{2,}(_[A-Z0-9]+)+$/;
+
+interface ParsedCurriculum {
+  stage: string;
+  grade: string;
+  subject: string;
+}
+
+/**
+ * Curriculum entries are stored as "stage-grade-CODE:subject".
+ * Older records are a bare subject name with no stage or grade.
+ */
+function parseCurriculumEntry(entry: string): ParsedCurriculum {
+  const separatorIndex = entry.indexOf(":");
+
+  // Legacy format: just a subject name
+  if (separatorIndex === -1) {
+    return { stage: "", grade: "", subject: entry.trim() };
+  }
+
+  const key = entry.slice(0, separatorIndex);
+  const subject = entry.slice(separatorIndex + 1).trim();
+  const parts = key.split("-").filter(Boolean);
+
+  // Drop the trailing subject code so it never reaches the UI
+  if (parts.length && SUBJECT_CODE.test(parts[parts.length - 1])) {
+    parts.pop();
+  }
+
+  const stage = parts.shift() || "";
+  const grade = parts.join("-");
+
+  return { stage, grade, subject: subject || entry.trim() };
+}
+
+/** Group entries as stage -> grade -> subjects for display. */
+function groupCurriculum(entries: string[]) {
+  const stages = new Map<string, Map<string, string[]>>();
+
+  for (const entry of entries) {
+    const { stage, grade, subject } = parseCurriculumEntry(entry);
+    const stageKey = stage || "لم تحدد المرحلة";
+    const gradeKey = grade || "";
+
+    if (!stages.has(stageKey)) stages.set(stageKey, new Map());
+    const grades = stages.get(stageKey)!;
+
+    if (!grades.has(gradeKey)) grades.set(gradeKey, []);
+    grades.get(gradeKey)!.push(subject);
+  }
+
+  return Array.from(stages.entries()).map(([stage, grades]) => ({
+    stage,
+    grades: Array.from(grades.entries()).map(([grade, subjects]) => ({
+      grade,
+      subjects,
+    })),
+  }));
+}
 
 export default function TeacherProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -58,16 +129,24 @@ export default function TeacherProfilePage() {
     name: "",
     email: "",
     phone: "",
-    bio: "",
-    subjects: "",
-    experience: "",
-    education: "",
   });
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
+  // Lives under verificationData on the user, not as top-level fields
+  const [qualifications, setQualifications] = useState({
+    experience: "",
+    bio: "",
+  });
+  const [isSavingQualifications, setIsSavingQualifications] = useState(false);
+  const [isGeneratingExperience, setIsGeneratingExperience] = useState(false);
+  const [isGeneratingBio, setIsGeneratingBio] = useState(false);
+  // Documents are excluded from /auth/me and loaded only when the tab opens
+  const [documents, setDocuments] = useState<string[] | null>(null);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const hasRequestedDocuments = useRef(false);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
@@ -77,14 +156,42 @@ export default function TeacherProfilePage() {
         name: user.name || "",
         email: user.email || "",
         phone: user.phone || "",
-        bio: (user as any).bio || "",
-        subjects: (user as any).subjects || "",
-        experience: (user as any).experience || "",
-        education: (user as any).education || "",
       });
-      setAvatarUrl((user as any).avatarUrl || null);
+      setAvatarUrl(user.avatarUrl || null);
+      setQualifications({
+        experience: user.verificationData?.experience || "",
+        bio: user.verificationData?.bio || "",
+      });
     }
   }, [user]);
+
+  // Load verification documents the first time the qualifications tab is shown.
+  // The "already requested" flag is a ref, not state: putting it in the
+  // dependency array would re-run this effect and cancel the in-flight request.
+  useEffect(() => {
+    if (activeTab !== "qualifications" || hasRequestedDocuments.current) {
+      return;
+    }
+
+    hasRequestedDocuments.current = true;
+
+    const fetchDocuments = async () => {
+      setIsLoadingDocuments(true);
+      try {
+        const response = await api.get("/verification/my-documents");
+        setDocuments(response.data?.data?.documents || []);
+      } catch {
+        setDocuments([]);
+        // Allow a retry the next time the tab is opened
+        hasRequestedDocuments.current = false;
+        toast.error("تعذر تحميل المستندات");
+      } finally {
+        setIsLoadingDocuments(false);
+      }
+    };
+
+    fetchDocuments();
+  }, [activeTab]);
 
   // Fetch notification settings
   useEffect(() => {
@@ -112,7 +219,7 @@ export default function TeacherProfilePage() {
       });
       setNotificationSettings(updated);
       toast.success("تم تحديث إعدادات الإشعارات");
-    } catch (error) {
+    } catch {
       toast.error("خطأ في تحديث إعدادات الإشعارات");
     }
   };
@@ -134,13 +241,13 @@ export default function TeacherProfilePage() {
     setIsUploading(true);
     try {
       const supabase = createClient();
-      const userId = (user as any)._id || user?.id;
+      const userId = user?._id || user?.id;
       
       const fileExt = file.name.split(".").pop();
       const fileName = `${userId}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      let { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(filePath, file, {
           cacheControl: "3600",
@@ -164,19 +271,90 @@ export default function TeacherProfilePage() {
       setAvatarUrl(newAvatarUrl);
       await refreshUser();
       toast.success("تم تحديث الصورة الشخصية بنجاح");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error uploading image:", error);
-      toast.error(error.message || "حدث خطأ أثناء رفع الصورة");
+      toast.error(getErrorMessage(error, "حدث خطأ أثناء رفع الصورة"));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
+  const handleGenerateExperience = async () => {
+    setIsGeneratingExperience(true);
+    try {
+      let generated = "";
+      await streamChat(
+        undefined,
+        [{ role: "user", content: "اكتب خبرة مهنية احترافية لمعلم يبحث عن عمل في منصة تعليمية. اكتب من 3 إلى 5 جمل تصف خبرته في التدريس وأسلوبه وقدرته على توصيل المعلومات. بالعربية الفصحى." }],
+        (chunk) => {
+          generated += chunk;
+          setQualifications((prev) => ({ ...prev, experience: generated }));
+        },
+        (error) => {
+          toast.error("حدث خطأ أثناء التوليد");
+        }
+      );
+      toast.success("تم توليد الخبرة بنجاح");
+    } catch {
+      toast.error("تعذر توليد الخبرة");
+    } finally {
+      setIsGeneratingExperience(false);
+    }
+  };
+
+  const handleGenerateBio = async () => {
+    setIsGeneratingBio(true);
+    try {
+      let generated = "";
+      await streamChat(
+        undefined,
+        [{ role: "user", content: "اكتب سيرة ذاتية احترافية وجذابة لمعلم في منصة تعليمية إلكترونية. يجب أن تتضمن: التعريف بنفسه، خبراته التعليمية، أسلوبه في التدريس، وما يميزه عن غيره. اكتب من 4 إلى 6 جمل. بالعربية الفصحى." }],
+        (chunk) => {
+          generated += chunk;
+          setQualifications((prev) => ({ ...prev, bio: generated }));
+        },
+        (error) => {
+          toast.error("حدث خطأ أثناء التوليد");
+        }
+      );
+      toast.success("تم توليد السيرة الذاتية بنجاح");
+    } catch {
+      toast.error("تعذر توليد السيرة الذاتية");
+    } finally {
+      setIsGeneratingBio(false);
+    }
+  };
+
+  const handleSaveQualifications = async () => {
+    if (qualifications.experience.length > 500) {
+      toast.error("الخبرة يجب ألا تتجاوز ٥٠٠ حرف");
+      return;
+    }
+    if (qualifications.bio.length > 2000) {
+      toast.error("السيرة الذاتية يجب ألا تتجاوز ٢٠٠٠ حرف");
+      return;
+    }
+
+    setIsSavingQualifications(true);
+    try {
+      await api.put("/verification/my-details", {
+        experience: qualifications.experience,
+        bio: qualifications.bio,
+      });
+      await refreshUser();
+      toast.success("تم تحديث البيانات بنجاح");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث البيانات"));
+    } finally {
+      setIsSavingQualifications(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     
-    const userId = (user as any)._id || user.id;
+    const userId = user._id || user.id;
     if (!userId) {
       toast.error("لم يتم العثور على معرف المستخدم");
       return;
@@ -184,20 +362,17 @@ export default function TeacherProfilePage() {
 
     setIsSaving(true);
     try {
+      // Only these fields are accepted by the API; bio and experience live on
+      // verificationData and are saved from the qualifications tab.
       await api.put(`/users/${userId}`, {
         name: formData.name,
         phone: formData.phone,
-        bio: formData.bio,
-        subjects: formData.subjects,
-        experience: formData.experience,
-        education: formData.education,
       });
       await refreshUser();
       toast.success("تم تحديث الملف الشخصي بنجاح");
       setIsEditing(false);
-    } catch (error: any) {
-      const message = error.response?.data?.message || "حدث خطأ أثناء تحديث الملف الشخصي";
-      toast.error(message);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "حدث خطأ أثناء تحديث الملف الشخصي"));
     } finally {
       setIsSaving(false);
     }
@@ -225,8 +400,8 @@ export default function TeacherProfilePage() {
       });
       toast.success("تم تحديث كلمة المرور بنجاح");
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "تعذر تحديث كلمة المرور");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث كلمة المرور"));
     } finally {
       setIsChangingPassword(false);
     }
@@ -365,7 +540,7 @@ export default function TeacherProfilePage() {
                   <div className="flex items-center gap-3 text-sm">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <span className="text-muted-foreground">
-                      عضو_since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString("ar-EG") : "يناير ٢٠٢٤"}
+                      عضو_منذ {user?.createdAt ? new Date(user.createdAt).toLocaleDateString("ar-EG") : "يناير ٢٠٢٤"}
                     </span>
                   </div>
                 </div>
@@ -473,9 +648,12 @@ export default function TeacherProfilePage() {
               {activeTab === "personal" && (
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h3 className="text-lg font-bold">المعلومات الشخصية</h3>
-                      <p className="text-sm text-muted-foreground mt-1">تحديث بياناتك الشخصية ومعلومات الاتصال</p>
+                    <div className="flex items-center gap-3">
+                      <User className={`w-5 h-5 shrink-0 ${iconColor.people}`} />
+                      <div>
+                        <h3 className="text-lg font-bold">المعلومات الشخصية</h3>
+                        <p className="text-sm text-muted-foreground mt-1">تحديث بياناتك الشخصية ومعلومات الاتصال</p>
+                      </div>
                     </div>
                     {!isEditing ? (
                       <Button onClick={() => setIsEditing(true)} className="gap-2 bg-green-600 hover:bg-green-700">
@@ -552,16 +730,17 @@ export default function TeacherProfilePage() {
                       </div>
                     </div>
 
-                    <div className="md:col-span-2 space-y-2">
-                      <Label htmlFor="bio">نبذة عنك</Label>
-                      <textarea
-                        id="bio"
-                        value={formData.bio}
-                        onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                        disabled={!isEditing}
-                        className="w-full min-h-[100px] px-3 py-2 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        placeholder="اكتب نبذة مختصرة عنك وعن خبراتك التعليمية..."
-                      />
+                    <div className="md:col-span-2 p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm text-muted-foreground">
+                        النبذة والخبرة تُحرَّران من تبويب{" "}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("qualifications")}
+                          className="text-green-600 font-medium hover:underline"
+                        >
+                          المؤهلات والخبرات
+                        </button>
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -571,14 +750,101 @@ export default function TeacherProfilePage() {
               {activeTab === "qualifications" && (
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h3 className="text-lg font-bold">المؤهلات والخبرات</h3>
-                      <p className="text-sm text-muted-foreground mt-1">أضف مؤهلاتك التعليمية وخبراتك</p>
+                    <div className="flex items-center gap-3">
+                      <Award className={`w-5 h-5 shrink-0 ${iconColor.learning}`} />
+                      <div>
+                        <h3 className="text-lg font-bold">المؤهلات والخبرات</h3>
+                        <p className="text-sm text-muted-foreground mt-1">أضف مؤهلاتك التعليمية وخبراتك</p>
+                      </div>
                     </div>
-                    <Button className="gap-2 bg-green-600 hover:bg-green-700">
-                      <Save className="w-4 h-4" />
-                      حفظ
+                    <Button
+                      onClick={handleSaveQualifications}
+                      disabled={isSavingQualifications}
+                      className="gap-2 bg-green-600 hover:bg-green-700"
+                    >
+                      {isSavingQualifications ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      {isSavingQualifications ? "جاري الحفظ..." : "حفظ"}
                     </Button>
+                  </div>
+
+                  {/* Editable details */}
+                  <div className="mb-6 space-y-5">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="experience">الخبرة</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleGenerateExperience}
+                          disabled={isGeneratingExperience}
+                          className="h-7 gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                        >
+                          {isGeneratingExperience ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5" />
+                          )}
+                          توليد بالذكاء
+                        </Button>
+                      </div>
+                      <Input
+                        id="experience"
+                        value={qualifications.experience}
+                        onChange={(e) =>
+                          setQualifications({ ...qualifications, experience: e.target.value })
+                        }
+                        maxLength={500}
+                        className="h-10"
+                        placeholder="مثال: ٨ سنوات في تدريس الرياضيات للمرحلة الإعدادية"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {qualifications.experience.length} / ٥٠٠
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="teacher-bio">السيرة الذاتية</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleGenerateBio}
+                          disabled={isGeneratingBio}
+                          className="h-7 gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                        >
+                          {isGeneratingBio ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5" />
+                          )}
+                          توليد بالذكاء
+                        </Button>
+                      </div>
+                      <textarea
+                        id="teacher-bio"
+                        value={qualifications.bio}
+                        onChange={(e) =>
+                          setQualifications({ ...qualifications, bio: e.target.value })
+                        }
+                        maxLength={2000}
+                        rows={5}
+                        className="w-full px-3 py-2 rounded-lg border bg-transparent text-base md:text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-y"
+                        placeholder="عرّف الطلاب وأولياء الأمور بخبراتك وأسلوبك في التدريس"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {qualifications.bio.length} / ٢٠٠٠
+                      </p>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      المناهج والمستندات جزء من طلب التحقق المعتمد ولا يمكن تعديلها من هنا.
+                    </p>
                   </div>
 
                   {/* Verification Info from Registration */}
@@ -591,51 +857,112 @@ export default function TeacherProfilePage() {
                       <div>
                         <span className="text-muted-foreground">الحالة: </span>
                         <span className="font-medium">
-                          {(user as any)?.verificationStatus === "VERIFIED" ? "معتمد ✓" :
-                           (user as any)?.verificationStatus === "PENDING" ? "قيد المراجعة" :
-                           (user as any)?.verificationStatus === "REJECTED" ? "مرفوض" : "لم يقدم"}
+                          {user?.verificationStatus === "VERIFIED" ? "معتمد ✓" :
+                           user?.verificationStatus === "PENDING" ? "قيد المراجعة" :
+                           user?.verificationStatus === "REJECTED" ? "مرفوض" : "لم يقدم"}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">الخبرة: </span>
-                        <span className="font-medium">{(user as any)?.verificationData?.experience || formData.experience || "غير محدد"}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">السيرة الذاتية: </span>
-                        <span className="font-medium">{(user as any)?.verificationData?.bio || formData.bio || "غير مضافة"}</span>
-                      </div>
                       <div className="md:col-span-2">
-                        <span className="text-muted-foreground">المناهج: </span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {Array.isArray((user as any)?.verificationData?.curriculum) &&
-                          (user as any).verificationData.curriculum.length > 0 ? (
-                            (user as any).verificationData.curriculum.map((entry: string, i: number) => {
-                              const [key, subjectName] = entry.split(":");
-                              const parts = key ? key.split("-") : [];
-                              const stage = parts[0] || "";
-                              const grade = parts.slice(1).join("-");
-                              return (
-                                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs">
-                                  <span className="font-medium">{subjectName}</span>
-                                  <span className="text-muted-foreground">({stage} - {grade})</span>
-                                </span>
-                              );
-                            })
+                        <span className="text-muted-foreground">المراحل والصفوف التي تدرّسها: </span>
+                        <div className="mt-2 space-y-3">
+                          {user?.verificationData?.curriculum?.length ? (
+                            groupCurriculum(user.verificationData.curriculum).map(
+                              (stageGroup) => (
+                                <div
+                                  key={stageGroup.stage}
+                                  className="p-3 bg-background rounded-lg border"
+                                >
+                                  <p className="font-semibold text-sm flex items-center gap-1.5">
+                                    <GraduationCap className="w-4 h-4 text-green-600" />
+                                    {stageGroup.stage}
+                                  </p>
+                                  <div className="mt-2 space-y-1.5">
+                                    {stageGroup.grades.map((gradeGroup, gi) => (
+                                      <div
+                                        key={gi}
+                                        className="flex flex-wrap items-center gap-2"
+                                      >
+                                        {gradeGroup.grade && (
+                                          <span className="text-xs text-muted-foreground min-w-[120px]">
+                                            {gradeGroup.grade}
+                                          </span>
+                                        )}
+                                        <div className="flex flex-wrap gap-1">
+                                          {gradeGroup.subjects.map((subject, si) => (
+                                            <span
+                                              key={si}
+                                              className="px-2 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs font-medium"
+                                            >
+                                              {subject}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            )
                           ) : (
-                            <span className="font-medium">{formData.subjects || "غير محددة"}</span>
+                            <span className="font-medium">غير محددة</span>
                           )}
                         </div>
                       </div>
-                      {(user as any)?.verificationData?.documents?.length > 0 && (
-                        <div className="md:col-span-2">
-                          <span className="text-muted-foreground">المستندات: </span>
-                          <span className="font-medium">{(user as any).verificationData.documents.length} مستند مرفق</span>
+
+                      {/* Uploaded documents */}
+                      <div className="md:col-span-2">
+                        <span className="text-muted-foreground">المستندات المرفوعة: </span>
+                        <div className="mt-2">
+                          {isLoadingDocuments ? (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              جاري تحميل المستندات...
+                            </div>
+                          ) : !documents || documents.length === 0 ? (
+                            <span className="font-medium">لا توجد مستندات مرفوعة</span>
+                          ) : (
+                            <div className="space-y-2">
+                              {documents.map((url, index) => {
+                                const isImage = /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
+                                return (
+                                  <div
+                                    key={index}
+                                    className="flex items-center gap-3 p-2.5 bg-background rounded-lg border"
+                                  >
+                                    <div className="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+                                      {isImage ? (
+                                        <ImageIcon className="w-4 h-4 text-green-600" />
+                                      ) : (
+                                        <FileText className="w-4 h-4 text-green-600" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium truncate">
+                                        {documentTypeLabels[index] || `مستند ${index + 1}`}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {isImage ? "صورة" : "PDF"}
+                                      </p>
+                                    </div>
+                                    <a
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-green-600 dark:text-green-400 hover:underline shrink-0 px-2"
+                                    >
+                                      عرض الملف
+                                    </a>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {(user as any)?.verifiedAt && (
+                      </div>
+                      {user?.verifiedAt && (
                         <div className="md:col-span-2">
                           <span className="text-muted-foreground">تاريخ الاعتماد: </span>
-                          <span className="font-medium">{new Date((user as any).verifiedAt).toLocaleDateString("ar-EG")}</span>
+                          <span className="font-medium">{new Date(user.verifiedAt!).toLocaleDateString("ar-EG")}</span>
                         </div>
                       )}
                     </div>
@@ -649,9 +976,12 @@ export default function TeacherProfilePage() {
               {activeTab === "security" && (
                 <div className="p-6 space-y-6">
                   <div>
-                    <div className="mb-5">
-                      <h3 className="text-lg font-bold">تغيير كلمة المرور</h3>
-                      <p className="text-sm text-muted-foreground mt-1">تأكد من استخدام كلمة مرور قوية وفريدة</p>
+                    <div className="mb-5 flex items-center gap-3">
+                      <Lock className={`w-5 h-5 shrink-0 ${iconColor.security}`} />
+                      <div>
+                        <h3 className="text-lg font-bold">تغيير كلمة المرور</h3>
+                        <p className="text-sm text-muted-foreground mt-1">تأكد من استخدام كلمة مرور قوية وفريدة</p>
+                      </div>
                     </div>
 
                     <div className="max-w-md space-y-4">
@@ -739,9 +1069,12 @@ export default function TeacherProfilePage() {
                   <div className="border-t" />
 
                   <div>
-                    <div className="mb-5">
-                      <h3 className="text-lg font-bold">المصادقة الثنائية</h3>
-                      <p className="text-sm text-muted-foreground mt-1">أضف طبقة حماية إضافية لحسابك</p>
+                    <div className="mb-5 flex items-center gap-3">
+                      <Shield className={`w-5 h-5 shrink-0 ${iconColor.security}`} />
+                      <div>
+                        <h3 className="text-lg font-bold">المصادقة الثنائية</h3>
+                        <p className="text-sm text-muted-foreground mt-1">أضف طبقة حماية إضافية لحسابك</p>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between p-5 bg-muted/50 rounded-xl">
@@ -766,9 +1099,12 @@ export default function TeacherProfilePage() {
               {/* Notifications Tab */}
               {activeTab === "notifications" && (
                 <div className="p-6">
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold">إعدادات الإشعارات</h3>
-                    <p className="text-sm text-muted-foreground mt-1">تحكم في الإشعارات التي تتلقاها</p>
+                  <div className="mb-6 flex items-center gap-3">
+                    <Bell className={`w-5 h-5 shrink-0 ${iconColor.alert}`} />
+                    <div>
+                      <h3 className="text-lg font-bold">إعدادات الإشعارات</h3>
+                      <p className="text-sm text-muted-foreground mt-1">تحكم في الإشعارات التي تتلقاها</p>
+                    </div>
                   </div>
 
                   {isLoadingSettings ? (

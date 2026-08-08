@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
+import { iconColor } from "@/lib/icon-styles";
 import {
   BookOpen,
   Calendar,
@@ -12,7 +13,6 @@ import {
   ArrowLeft,
   TrendingUp,
   CheckCircle,
-  Video,
   Loader2,
 } from "lucide-react";
 
@@ -231,14 +231,14 @@ export default function StudentDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div className="bg-card border rounded-xl p-5 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
-              <BookOpen className="w-6 h-6 text-blue-500" />
+              <BookOpen className={`w-6 h-6 ${iconColor.learning}`} />
             </div>
             <p className="text-3xl font-bold mb-1">{groups.length}</p>
             <p className="text-sm text-muted-foreground">مجموعات مسجلة</p>
           </div>
           <div className="bg-card border rounded-xl p-5 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-green-500/10 flex items-center justify-center mb-3">
-              <CheckCircle className="w-6 h-6 text-green-500" />
+              <CheckCircle className={`w-6 h-6 ${iconColor.success}`} />
             </div>
             <p className="text-3xl font-bold mb-1">
               {sessions.filter((s) => s.status === "COMPLETED").length}
@@ -247,7 +247,7 @@ export default function StudentDashboard() {
           </div>
           <div className="bg-card border rounded-xl p-5 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-purple-500/10 flex items-center justify-center mb-3">
-              <TrendingUp className="w-6 h-6 text-purple-500" />
+              <TrendingUp className={`w-6 h-6 ${iconColor.progress}`} />
             </div>
             <p className="text-3xl font-bold mb-1">
               {sessions.length > 0
@@ -263,7 +263,7 @@ export default function StudentDashboard() {
           </div>
           <div className="bg-card border rounded-xl p-5 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-orange-500/10 flex items-center justify-center mb-3">
-              <Calendar className="w-6 h-6 text-orange-500" />
+              <Calendar className={`w-6 h-6 ${iconColor.schedule}`} />
             </div>
             <p className="text-3xl font-bold mb-1">{upcomingSessions.length}</p>
             <p className="text-sm text-muted-foreground">حصص متبقية</p>
@@ -284,9 +284,9 @@ export default function StudentDashboard() {
                 >
                   <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center">
                     {session.status === "COMPLETED" ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <CheckCircle className={`w-5 h-5 ${iconColor.success}`} />
                     ) : (
-                      <Clock className="w-5 h-5 text-blue-500" />
+                      <Clock className={`w-5 h-5 ${iconColor.schedule}`} />
                     )}
                   </div>
                   <div className="flex-1">

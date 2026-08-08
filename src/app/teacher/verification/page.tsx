@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { createClient } from "@/lib/supabase/client";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   GraduationCap,
   FileText,
@@ -19,7 +19,6 @@ import {
   Send,
   Trash2,
   File,
-  Image as ImageIcon,
   Shield,
 } from "lucide-react";
 
@@ -165,45 +164,33 @@ export default function TeacherVerificationPage() {
     setUploading((prev) => ({ ...prev, [docType]: true }));
 
     try {
-      const supabase = createClient();
-      const userId = (user as any)?._id || user?.id;
-      
-      const fileExt = file.name.split(".").pop();
-      const fileName = `verification/${userId}/${docType}-${Date.now()}.${fileExt}`;
+      // Uploads go through the API, which holds the service key. The storage
+      // bucket has no RLS policy permitting direct end-user writes, and this
+      // way the server decides the path so files cannot collide across users.
+      const body = new FormData();
+      body.append("file", file);
+      body.append("docType", docType);
 
-      const { error: uploadError, data } = await supabase.storage
-        .from("documents")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
+      const response = await api.post("/verification/upload-document", body);
 
-      // Never fall back to embedding base64 in the database: that silently
-      // stored hundreds of KB per document and made every authenticated
-      // request slow. Fail loudly instead so the bucket gets fixed.
-      if (uploadError?.message?.includes("Bucket not found")) {
-        console.error('Supabase Storage bucket "documents" is missing');
-        toast.error("تعذر رفع الملف: مساحة التخزين غير مهيأة. تواصل مع الدعم.");
-        return;
+      const uploaded = response.data?.data;
+      if (!uploaded?.url) {
+        throw new Error("لم يتم استلام رابط الملف");
       }
 
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(fileName);
-      
       setDocuments((prev) => ({
         ...prev,
         [docType]: {
-          url: urlData.publicUrl,
-          name: file.name,
-          type: file.type,
+          url: uploaded.url,
+          name: uploaded.name || file.name,
+          type: uploaded.type || file.type,
         },
       }));
 
       toast.success("تم رفع الملف بنجاح");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error uploading file:", error);
-      toast.error(error.message || "حدث خطأ أثناء رفع الملف");
+      toast.error(getErrorMessage(error, "حدث خطأ أثناء رفع الملف"));
     } finally {
       setUploading((prev) => ({ ...prev, [docType]: false }));
     }
@@ -252,9 +239,8 @@ export default function TeacherVerificationPage() {
 
       await refreshUser();
       toast.success("تم إرسال طلب التحقق بنجاح");
-    } catch (error: any) {
-      const message = error.response?.data?.message || "حدث خطأ أثناء إرسال الطلب";
-      toast.error(message);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "حدث خطأ أثناء إرسال الطلب"));
     } finally {
       setLoading(false);
     }

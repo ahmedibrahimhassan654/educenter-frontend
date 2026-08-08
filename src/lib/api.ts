@@ -47,7 +47,7 @@ async function getCachedSession() {
 
 // API Response Cache
 interface CacheEntry {
-  data: any;
+  data: unknown;
   expiry: number;
 }
 
@@ -61,7 +61,11 @@ const longCacheEndpoints = ["/curriculum", "/groups?explore=true"];
 // Auth endpoints must never be cached - stale role data breaks redirects
 const neverCacheEndpoints = ["/auth/"];
 
-function getCacheKey(config: any): string | null {
+function getCacheKey(config: {
+  method?: string;
+  url?: string;
+  params?: unknown;
+}): string | null {
   // Only cache GET requests
   if (config.method !== "get") return null;
 
@@ -84,6 +88,14 @@ api.interceptors.request.use(async (config) => {
 
   if (session?.access_token) {
     config.headers.Authorization = `Bearer ${session.access_token}`;
+  }
+
+  // Let the browser set multipart/form-data itself so it can append the
+  // boundary. `delete` is not enough: axios then falls back to the instance
+  // default (application/json), and an explicitly passed "multipart/form-data"
+  // would be sent with no boundary. Setting null makes axios omit the header.
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    config.headers.setContentType(null);
   }
 
   // Check cache for GET requests

@@ -4,14 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
+import { iconColor } from "@/lib/icon-styles";
 import {
   Wallet,
   Calendar,
   BookOpen,
-  ArrowLeft,
-  TrendingUp,
   CheckCircle,
-  Clock,
   ChevronDown,
   Loader2,
   Users,
@@ -136,7 +134,7 @@ export default function ParentDashboard() {
           <div className="bg-card border rounded-xl p-6">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-blue-500" />
+                <BookOpen className={`w-6 h-6 ${iconColor.learning}`} />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">الفصول المسجلة</p>
@@ -147,7 +145,7 @@ export default function ParentDashboard() {
           <div className="bg-card border rounded-xl p-6">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-green-500" />
+                <CheckCircle className={`w-6 h-6 ${iconColor.success}`} />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">الحالة</p>
@@ -158,7 +156,7 @@ export default function ParentDashboard() {
           <div className="bg-card border rounded-xl p-6">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-500" />
+                <Users className={`w-6 h-6 ${iconColor.people}`} />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">الطلاب</p>
@@ -211,14 +209,14 @@ export default function ParentDashboard() {
         <div className="grid md:grid-cols-2 gap-6">
           <Link href="/parent/payments" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
             <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
-              <Wallet className="w-6 h-6 text-purple-500" />
+              <Wallet className={`w-6 h-6 ${iconColor.money}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">المدفوعات والفواتير</h4>
             <p className="text-sm text-muted-foreground">عرض ودفع الفواتير المستحقة</p>
           </Link>
           <Link href="/parent/reports" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
             <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4">
-              <Calendar className="w-6 h-6 text-blue-500" />
+              <Calendar className={`w-6 h-6 ${iconColor.schedule}`} />
             </div>
             <h4 className="text-lg font-semibold mb-2">التقارير والتقييمات</h4>
             <p className="text-sm text-muted-foreground">متابعة تقارير الحضور والملاحظات</p>

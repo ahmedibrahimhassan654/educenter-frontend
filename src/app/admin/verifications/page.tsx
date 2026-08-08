@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { iconColor } from "@/lib/icon-styles";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Users,
   CheckCircle,
@@ -14,7 +16,6 @@ import {
   FileText,
   Mail,
   Phone,
-  Calendar,
   X,
   File,
   Download,
@@ -54,7 +55,6 @@ export default function AdminVerificationsPage() {
   const [actionNotes, setActionNotes] = useState("");
   const [processing, setProcessing] = useState(false);
   const [docsLoading, setDocsLoading] = useState(false);
-  const [docsLoaded, setDocsLoaded] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   const fetchTeachers = async () => {
@@ -83,9 +83,8 @@ export default function AdminVerificationsPage() {
       setSelectedTeacher(null);
       setActionNotes("");
       fetchTeachers();
-    } catch (error: any) {
-      const message = error.response?.data?.message || "حدث خطأ أثناء الموافقة";
-      toast.error(message);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "حدث خطأ أثناء الموافقة"));
     } finally {
       setProcessing(false);
     }
@@ -105,9 +104,8 @@ export default function AdminVerificationsPage() {
       setSelectedTeacher(null);
       setActionNotes("");
       fetchTeachers();
-    } catch (error: any) {
-      const message = error.response?.data?.message || "حدث خطأ أثناء الرفض";
-      toast.error(message);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "حدث خطأ أثناء الرفض"));
     } finally {
       setProcessing(false);
     }
@@ -117,7 +115,6 @@ export default function AdminVerificationsPage() {
     setSelectedTeacher(teacher);
     setActionNotes("");
     setShowModal(true);
-    setDocsLoaded(false);
     setImageErrors({});
 
     // The list response omits the (large) documents, so load them on demand
@@ -142,7 +139,8 @@ export default function AdminVerificationsPage() {
 
     // Preload document images
     if (docs && docs.length > 0) {
-      const imageDocs = docs.filter((url) => url.match(/\.(jpg|jpeg|png|webp)$/i) || url.startsWith("data:image"));
+      // Signed URLs carry a ?token=... suffix, so the extension is not at the end
+      const imageDocs = docs.filter((url) => /\.(jpg|jpeg|png|webp)(\?|$)/i.test(url) || url.startsWith("data:image"));
       if (imageDocs.length > 0) {
         setDocsLoading(true);
         let loaded = 0;
@@ -152,23 +150,17 @@ export default function AdminVerificationsPage() {
             loaded++;
             if (loaded === imageDocs.length) {
               setDocsLoading(false);
-              setDocsLoaded(true);
             }
           };
           img.onerror = () => {
             loaded++;
             if (loaded === imageDocs.length) {
               setDocsLoading(false);
-              setDocsLoaded(true);
             }
           };
           img.src = url;
         });
-      } else {
-        setDocsLoaded(true);
       }
-    } else {
-      setDocsLoaded(true);
     }
   };
 
@@ -360,8 +352,8 @@ export default function AdminVerificationsPage() {
               {selectedTeacher.verificationData && (
                 <>
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
+                    <h4 className="font-semibold mb-2 flex items-center gap-3">
+                      <FileText className={`w-4 h-4 shrink-0 ${iconColor.document}`} />
                       الخبرة التعليمية
                     </h4>
                     <p className="text-muted-foreground">
@@ -370,8 +362,8 @@ export default function AdminVerificationsPage() {
                   </div>
 
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <GraduationCap className="w-4 h-4" />
+                    <h4 className="font-semibold mb-2 flex items-center gap-3">
+                      <GraduationCap className={`w-4 h-4 shrink-0 ${iconColor.learning}`} />
                       المناهج الدراسية
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -398,8 +390,8 @@ export default function AdminVerificationsPage() {
                   {/* Documents */}
                   {selectedTeacher.verificationData.documents && selectedTeacher.verificationData.documents.length > 0 && (
                     <div className="border rounded-lg p-4">
-                      <h4 className="font-semibold mb-3 flex items-center gap-2">
-                        <File className="w-4 h-4" />
+                      <h4 className="font-semibold mb-3 flex items-center gap-3">
+                        <File className={`w-4 h-4 shrink-0 ${iconColor.document}`} />
                         المستندات المرفقة
                       </h4>
                       {docsLoading ? (
@@ -412,7 +404,7 @@ export default function AdminVerificationsPage() {
                           {selectedTeacher.verificationData.documents.map((docUrl, index) => {
                             const docLabels = ["البطاقة الشخصية", "شهادة التخرج", "شهادة إضافية"];
                             const label = docLabels[index] || `مستند ${index + 1}`;
-                            const isImage = docUrl.match(/\.(jpg|jpeg|png|webp)$/i) || docUrl.startsWith("data:image");
+                            const isImage = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(docUrl) || docUrl.startsWith("data:image");
                             
                             return (
                               <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -430,7 +422,7 @@ export default function AdminVerificationsPage() {
                                           src={docUrl}
                                           alt={label}
                                           className="max-w-full h-auto max-h-48 rounded-lg border"
-                                          onError={(e) => {
+                                          onError={() => {
                                             setImageErrors((prev) => ({ ...prev, [index]: true }));
                                           }}
                                         />

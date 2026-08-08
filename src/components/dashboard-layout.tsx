@@ -22,52 +22,57 @@ import {
   Shield,
   Clock,
   XCircle,
+  Sparkles,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { NotificationBell } from "@/components/notification-bell";
+import { iconColor, type IconColorToken } from "@/lib/icon-styles";
 
 interface SidebarLink {
   href: string;
   label: string;
   icon: React.ElementType;
+  color: IconColorToken;
 }
 
 const teacherLinks: SidebarLink[] = [
-  { href: "/teacher", label: "لوحة التحكم", icon: LayoutDashboard },
-  { href: "/teacher/groups", label: "المجموعات", icon: Users },
-  { href: "/teacher/earnings", label: "الأرباح", icon: Wallet },
-  { href: "/notifications", label: "الإشعارات", icon: Bell },
-  { href: "/teacher/profile", label: "الملف الشخصي", icon: UserCircle },
+  { href: "/teacher", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
+  { href: "/teacher/ai-tools", label: "الذكاء الاصطناعي", icon: Sparkles, color: "learning" },
+  { href: "/teacher/groups", label: "المجموعات", icon: Users, color: "people" },
+  { href: "/teacher/earnings", label: "الأرباح", icon: Wallet, color: "money" },
+  { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
+  { href: "/teacher/profile", label: "الملف الشخصي", icon: UserCircle, color: "neutral" },
 ];
 
 // Limited links for unverified teachers
 const unverifiedTeacherLinks: SidebarLink[] = [
-  { href: "/teacher/verification", label: "تحقق من الحساب", icon: Shield },
-  { href: "/teacher/profile", label: "الملف الشخصي", icon: UserCircle },
+  { href: "/teacher/verification", label: "تحقق من الحساب", icon: Shield, color: "security" },
+  { href: "/teacher/profile", label: "الملف الشخصي", icon: UserCircle, color: "neutral" },
 ];
 
 const studentLinks: SidebarLink[] = [
-  { href: "/student", label: "لوحة التحكم", icon: LayoutDashboard },
-  { href: "/student/explore", label: "استكشف المجموعات", icon: Search },
-  { href: "/student/my-progress", label: "تقدمي", icon: BarChart3 },
-  { href: "/notifications", label: "الإشعارات", icon: Bell },
+  { href: "/student", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
+  { href: "/student/ai-study", label: "المعلم الذكي", icon: Sparkles, color: "learning" },
+  { href: "/student/explore", label: "استكشف المجموعات", icon: Search, color: "people" },
+  { href: "/student/my-progress", label: "تقدمي", icon: BarChart3, color: "progress" },
+  { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
 ];
 
 const parentLinks: SidebarLink[] = [
-  { href: "/parent", label: "لوحة التحكم", icon: LayoutDashboard },
-  { href: "/parent/payments", label: "المدفوعات", icon: Wallet },
-  { href: "/parent/reports", label: "التقارير", icon: FileText },
-  { href: "/notifications", label: "الإشعارات", icon: Bell },
+  { href: "/parent", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
+  { href: "/parent/payments", label: "المدفوعات", icon: Wallet, color: "money" },
+  { href: "/parent/reports", label: "التقارير", icon: FileText, color: "document" },
+  { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
 ];
 
 const adminLinks: SidebarLink[] = [
-  { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard },
-  { href: "/admin/users", label: "المستخدمين", icon: Users },
-  { href: "/admin/verifications", label: "طلبات التحقق", icon: Shield },
-  { href: "/admin/curriculum", label: "المنهاج الدراسي", icon: School },
-  { href: "/notifications", label: "الإشعارات", icon: Bell },
-  { href: "/admin/profile", label: "الملف الشخصي", icon: UserCircle },
+  { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
+  { href: "/admin/users", label: "المستخدمين", icon: Users, color: "people" },
+  { href: "/admin/verifications", label: "طلبات التحقق", icon: Shield, color: "security" },
+  { href: "/admin/curriculum", label: "المنهاج الدراسي", icon: School, color: "learning" },
+  { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
+  { href: "/admin/profile", label: "الملف الشخصي", icon: UserCircle, color: "neutral" },
 ];
 
 const roleLinks: Record<string, SidebarLink[]> = {
@@ -138,7 +143,7 @@ export default function DashboardLayout({
   };
 
   const displayName = user?.name || "";
-  const avatarUrl = (user as any)?.avatarUrl;
+  const avatarUrl = user?.avatarUrl;
 
   if (isLoading || !user) {
     return (
@@ -263,13 +268,16 @@ export default function DashboardLayout({
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+                  className={`flex items-center gap-3.5 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                     isActive
                       ? "bg-primary/10 text-primary"
                       : "hover:bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <link.icon className="w-5 h-5" />
+                  {/* Active item keeps the primary colour so the state stays obvious */}
+                  <link.icon
+                    className={`w-5 h-5 shrink-0 ${isActive ? "" : iconColor[link.color]}`}
+                  />
                   <span>{link.label}</span>
                 </Link>
               );
@@ -331,13 +339,15 @@ export default function DashboardLayout({
                       key={link.href}
                       href={link.href}
                       onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+                      className={`flex items-center gap-3.5 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                         isActive
                           ? "bg-primary/10 text-primary"
                           : "hover:bg-muted text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      <link.icon className="w-5 h-5" />
+                      <link.icon
+                        className={`w-5 h-5 shrink-0 ${isActive ? "" : iconColor[link.color]}`}
+                      />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -370,7 +380,7 @@ export default function DashboardLayout({
               </h1>
             </div>
             <div className="flex items-center gap-4">
-              <NotificationBell userId={(user as any)?._id || user?.id || ""} />
+              <NotificationBell userId={user?._id || user?.id || ""} />
               <DynamicThemeToggle />
               <Link href={`/${activeRole}/profile`} className="flex items-center gap-2">
                 {avatarUrl ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { iconColor } from "@/lib/icon-styles";
 import {
   CheckCircle,
   XCircle,
@@ -227,8 +228,8 @@ export default function ParentReportsPage() {
             </div>
 
             <div className="p-6 border-t">
-              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary" />
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-3">
+                <MessageSquare className={`w-5 h-5 shrink-0 ${iconColor.primary}`} />
                 ملاحظات المعلم
               </h4>
               <div className="space-y-3">
