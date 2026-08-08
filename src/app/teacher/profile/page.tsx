@@ -291,7 +291,7 @@ export default function TeacherProfilePage() {
           generated += chunk;
           setQualifications((prev) => ({ ...prev, experience: generated }));
         },
-        (error) => {
+        () => {
           toast.error("حدث خطأ أثناء التوليد");
         }
       );
@@ -314,7 +314,7 @@ export default function TeacherProfilePage() {
           generated += chunk;
           setQualifications((prev) => ({ ...prev, bio: generated }));
         },
-        (error) => {
+        () => {
           toast.error("حدث خطأ أثناء التوليد");
         }
       );
