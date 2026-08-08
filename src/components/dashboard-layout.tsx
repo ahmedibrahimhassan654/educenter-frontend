@@ -23,6 +23,7 @@ import {
   Clock,
   XCircle,
   Sparkles,
+  Settings,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -70,6 +71,7 @@ const adminLinks: SidebarLink[] = [
   { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
   { href: "/admin/users", label: "المستخدمين", icon: Users, color: "people" },
   { href: "/admin/verifications", label: "طلبات التحقق", icon: Shield, color: "security" },
+  { href: "/admin/settings", label: "إعدادات المنصة", icon: Settings, color: "neutral" },
   { href: "/admin/curriculum", label: "المنهاج الدراسي", icon: School, color: "learning" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
   { href: "/admin/profile", label: "الملف الشخصي", icon: UserCircle, color: "neutral" },

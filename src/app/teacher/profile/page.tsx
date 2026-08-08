@@ -31,6 +31,9 @@ import {
   Eye,
   EyeOff,
   ChevronLeft,
+  ChevronDown,
+  ChevronRight,
+  X,
   LogOut,
   Calendar,
   GraduationCap,
@@ -61,6 +64,22 @@ interface ParsedCurriculum {
   subject: string;
 }
 
+interface CurriculumSubject {
+  code: string;
+  name: string;
+}
+
+interface CurriculumGrade {
+  name: string;
+  subjects?: CurriculumSubject[];
+}
+
+interface CurriculumStage {
+  _id?: string;
+  name: string;
+  grades?: CurriculumGrade[];
+}
+
 /**
  * Curriculum entries are stored as "stage-grade-CODE:subject".
  * Older records are a bare subject name with no stage or grade.
@@ -88,30 +107,6 @@ function parseCurriculumEntry(entry: string): ParsedCurriculum {
   return { stage, grade, subject: subject || entry.trim() };
 }
 
-/** Group entries as stage -> grade -> subjects for display. */
-function groupCurriculum(entries: string[]) {
-  const stages = new Map<string, Map<string, string[]>>();
-
-  for (const entry of entries) {
-    const { stage, grade, subject } = parseCurriculumEntry(entry);
-    const stageKey = stage || "لم تحدد المرحلة";
-    const gradeKey = grade || "";
-
-    if (!stages.has(stageKey)) stages.set(stageKey, new Map());
-    const grades = stages.get(stageKey)!;
-
-    if (!grades.has(gradeKey)) grades.set(gradeKey, []);
-    grades.get(gradeKey)!.push(subject);
-  }
-
-  return Array.from(stages.entries()).map(([stage, grades]) => ({
-    stage,
-    grades: Array.from(grades.entries()).map(([grade, subjects]) => ({
-      grade,
-      subjects,
-    })),
-  }));
-}
 
 export default function TeacherProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -143,6 +138,14 @@ export default function TeacherProfilePage() {
   const [isSavingQualifications, setIsSavingQualifications] = useState(false);
   const [isGeneratingExperience, setIsGeneratingExperience] = useState(false);
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
+  // Curriculum editor state
+  const [curriculumTree, setCurriculumTree] = useState<CurriculumStage[]>([]);
+  const [selectedCurriculum, setSelectedCurriculum] = useState<string[]>([]);
+  const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
+  const [expandedGrades, setExpandedGrades] = useState<Set<string>>(new Set());
+  const [isLoadingCurriculum, setIsLoadingCurriculum] = useState(false);
+  const [isSavingCurriculum, setIsSavingCurriculum] = useState(false);
+  const curriculumLoaded = useRef(false);
   // Documents are excluded from /auth/me and loaded only when the tab opens
   const [documents, setDocuments] = useState<string[] | null>(null);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
@@ -192,6 +195,27 @@ export default function TeacherProfilePage() {
 
     fetchDocuments();
   }, [activeTab]);
+
+  // Load curriculum tree and current selections when qualifications tab opens
+  useEffect(() => {
+    if (activeTab !== "qualifications" || curriculumLoaded.current) return;
+    curriculumLoaded.current = true;
+
+    const fetchCurriculumData = async () => {
+      setIsLoadingCurriculum(true);
+      try {
+        const res = await api.get("/curriculum");
+        setCurriculumTree(res.data || []);
+        const current = user?.verificationData?.curriculum || [];
+        setSelectedCurriculum(current);
+      } catch {
+        toast.error("فشل في تحميل المناهج");
+      } finally {
+        setIsLoadingCurriculum(false);
+      }
+    };
+    fetchCurriculumData();
+  }, [activeTab, user]);
 
   // Fetch notification settings
   useEffect(() => {
@@ -323,6 +347,48 @@ export default function TeacherProfilePage() {
       toast.error("تعذر توليد السيرة الذاتية");
     } finally {
       setIsGeneratingBio(false);
+    }
+  };
+
+  const toggleCurriculumEntry = (uniqueKey: string, subjectName: string) => {
+    const entry = uniqueKey + ":" + subjectName;
+    setSelectedCurriculum((prev) =>
+      prev.includes(entry) ? prev.filter((e) => e !== entry) : [...prev, entry]
+    );
+  };
+
+  const toggleStage = (stage: string) => {
+    setExpandedStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(stage)) next.delete(stage);
+      else next.add(stage);
+      return next;
+    });
+  };
+
+  const toggleGrade = (key: string) => {
+    setExpandedGrades((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handleSaveCurriculum = async () => {
+    if (selectedCurriculum.length === 0) {
+      toast.error("يرجى تحديد مادة واحدة على الأقل");
+      return;
+    }
+    setIsSavingCurriculum(true);
+    try {
+      await api.put("/verification/my-details", { curriculum: selectedCurriculum });
+      await refreshUser();
+      toast.success("تم تحديث المناهج بنجاح");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث المناهج"));
+    } finally {
+      setIsSavingCurriculum(false);
     }
   };
 
@@ -842,72 +908,141 @@ export default function TeacherProfilePage() {
                       </p>
                     </div>
 
-                    <p className="text-xs text-muted-foreground">
-                      المناهج والمستندات جزء من طلب التحقق المعتمد ولا يمكن تعديلها من هنا.
-                    </p>
-                  </div>
-
-                  {/* Verification Info from Registration */}
-                  <div className="mb-6 p-5 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-200 dark:border-green-500/20">
-                    <div className="flex items-center gap-2 mb-4">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <h4 className="font-semibold text-green-700 dark:text-green-500">بيانات التحقق المقدمة</h4>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">الحالة: </span>
-                        <span className="font-medium">
-                          {user?.verificationStatus === "VERIFIED" ? "معتمد ✓" :
-                           user?.verificationStatus === "PENDING" ? "قيد المراجعة" :
-                           user?.verificationStatus === "REJECTED" ? "مرفوض" : "لم يقدم"}
-                        </span>
+                  {/* Curriculum Editor */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className={`w-5 h-5 ${iconColor.learning}`} />
+                        <h4 className="font-semibold">المراحل والصفوف التي تدرّسها</h4>
                       </div>
-                      <div className="md:col-span-2">
-                        <span className="text-muted-foreground">المراحل والصفوف التي تدرّسها: </span>
-                        <div className="mt-2 space-y-3">
-                          {user?.verificationData?.curriculum?.length ? (
-                            groupCurriculum(user.verificationData.curriculum).map(
-                              (stageGroup) => (
-                                <div
-                                  key={stageGroup.stage}
-                                  className="p-3 bg-background rounded-lg border"
-                                >
-                                  <p className="font-semibold text-sm flex items-center gap-1.5">
-                                    <GraduationCap className="w-4 h-4 text-green-600" />
-                                    {stageGroup.stage}
-                                  </p>
-                                  <div className="mt-2 space-y-1.5">
-                                    {stageGroup.grades.map((gradeGroup, gi) => (
-                                      <div
-                                        key={gi}
-                                        className="flex flex-wrap items-center gap-2"
-                                      >
-                                        {gradeGroup.grade && (
-                                          <span className="text-xs text-muted-foreground min-w-[120px]">
-                                            {gradeGroup.grade}
-                                          </span>
-                                        )}
-                                        <div className="flex flex-wrap gap-1">
-                                          {gradeGroup.subjects.map((subject, si) => (
-                                            <span
-                                              key={si}
-                                              className="px-2 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs font-medium"
-                                            >
-                                              {subject}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )
-                            )
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          المختار: {selectedCurriculum.length} مادة
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleSaveCurriculum}
+                          disabled={isSavingCurriculum}
+                          className="gap-1.5 bg-green-600 hover:bg-green-700 h-8"
+                        >
+                          {isSavingCurriculum ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           ) : (
-                            <span className="font-medium">غير محددة</span>
+                            <Save className="w-3.5 h-3.5" />
                           )}
+                          حفظ المناهج
+                        </Button>
+                      </div>
+                    </div>
+
+                    {selectedCurriculum.length > 0 && (
+                      <div className="mb-4 p-3 bg-green-50 dark:bg-green-500/10 rounded-lg border border-green-200 dark:border-green-500/20">
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedCurriculum.map((entry, i) => {
+                            const { stage, grade, subject } = parseCurriculumEntry(entry);
+                            return (
+                              <span
+                                key={i}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded text-xs font-medium"
+                              >
+                                {subject}
+                                <span className="text-muted-foreground">({stage} {grade ? `- ${grade}` : ""})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedCurriculum((prev) => prev.filter((e) => e !== entry))}
+                                  className="mr-0.5 hover:text-red-500"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
+                    )}
+
+                    {isLoadingCurriculum ? (
+                      <div className="flex items-center justify-center py-8 text-muted-foreground">
+                        <Loader2 className="w-5 h-5 animate-spin ml-2" />
+                        جاري تحميل المناهج...
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {curriculumTree.map((stage: CurriculumStage) => {
+                          const isStageExpanded = expandedStages.has(stage.name);
+                          return (
+                            <div key={stage._id || stage.name} className="border rounded-lg overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => toggleStage(stage.name)}
+                                className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                              >
+                                <span className="font-medium text-sm flex items-center gap-2">
+                                  <GraduationCap className="w-4 h-4 text-primary" />
+                                  {stage.name}
+                                </span>
+                                {isStageExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                )}
+                              </button>
+                              {isStageExpanded && stage.grades && (
+                                <div className="border-t">
+                                  {stage.grades.map((grade: CurriculumGrade) => {
+                                    const gradeKey = `${stage.name}-${grade.name}`;
+                                    const isGradeExpanded = expandedGrades.has(gradeKey);
+                                    return (
+                                      <div key={gradeKey} className="border-b last:border-b-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleGrade(gradeKey)}
+                                          className="w-full flex items-center justify-between p-3 pr-6 hover:bg-muted/30 transition-colors"
+                                        >
+                                          <span className="text-sm text-muted-foreground">{grade.name}</span>
+                                          {isGradeExpanded ? (
+                                            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                                          ) : (
+                                            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                                          )}
+                                        </button>
+                                        {isGradeExpanded && grade.subjects && (
+                                          <div className="px-3 pb-3 pr-8">
+                                            <div className="flex flex-wrap gap-1.5">
+                                              {grade.subjects.map((subject: CurriculumSubject) => {
+                                                const uniqueKey = `${stage.name}-${grade.name}-${subject.code}`;
+                                                const entry = `${uniqueKey}:${subject.name}`;
+                                                const isSelected = selectedCurriculum.includes(entry);
+                                                return (
+                                                  <button
+                                                    key={subject.code}
+                                                    type="button"
+                                                    onClick={() => toggleCurriculumEntry(uniqueKey, subject.name)}
+                                                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                                                      isSelected
+                                                        ? "bg-primary text-primary-foreground"
+                                                        : "bg-muted hover:bg-primary/10 hover:text-primary"
+                                                    }`}
+                                                  >
+                                                    {subject.name}
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
                       {/* Uploaded documents */}
                       <div className="md:col-span-2">
@@ -967,9 +1102,6 @@ export default function TeacherProfilePage() {
                       )}
                     </div>
                   </div>
-
-
-                </div>
               )}
 
               {/* Security Tab */}

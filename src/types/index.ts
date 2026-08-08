@@ -50,6 +50,7 @@ export interface Group {
   priceTeacherShare: number;
   platformFee: number;
   totalSessionPrice: number;
+  maxStudentsPerGroup: number;
   googleMeetLink: string;
   scheduleDays: string[];
   students: string[];

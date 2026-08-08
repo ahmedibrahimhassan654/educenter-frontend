@@ -13,6 +13,7 @@ import {
   Loader2,
   UserCircle,
   Bell,
+  Settings,
 } from "lucide-react";
 
 interface UserStats {
@@ -209,6 +210,13 @@ export default function AdminDashboard() {
             </div>
             <h4 className="text-lg font-semibold mb-2">إدارة المستخدمين</h4>
             <p className="text-sm text-muted-foreground">عرض وإدارة جميع المستخدمين</p>
+          </Link>
+          <Link href="/admin/settings" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
+            <div className={`w-12 h-12 rounded-xl ${iconChip.neutral} flex items-center justify-center mb-4`}>
+              <Settings className={`w-6 h-6 ${iconColor.neutral}`} />
+            </div>
+            <h4 className="text-lg font-semibold mb-2">إعدادات المنصة</h4>
+            <p className="text-sm text-muted-foreground">الأسعار الافتراضية وسعة المجموعات</p>
           </Link>
           <Link href="/admin/curriculum" className="bg-card border rounded-xl p-6 hover:shadow-md transition-all hover:-translate-y-1">
             <div className={`w-12 h-12 rounded-xl ${iconChip.learning} flex items-center justify-center mb-4`}>
