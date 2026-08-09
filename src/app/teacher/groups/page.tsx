@@ -167,11 +167,12 @@ export default function TeacherGroupsPage() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         fetchGroups();
+        fetchSettings();
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [fetchGroups]);
+  }, [fetchGroups, fetchSettings]);
 
   // Build a map of subjectCode -> { stage, grade, subjectName } from curriculum tree
   const curriculumMap = new Map<string, { stage: string; grade: string; subject: string }>();
@@ -284,9 +285,63 @@ export default function TeacherGroupsPage() {
     }
     const missingInfo = formData.scheduleSlots.some((s) => !s.day || !s.time);
     if (missingInfo) {
-      toast.error("يرجى إكمال اليوم والتاريخ والوقت لكل حصة");
+      toast.error("يرجى إكمال اليوم والوقت لكل حصة");
       return false;
     }
+
+    const newSlots = formData.scheduleSlots.map((s) => `${s.day} ${s.time}`);
+
+    const seen = new Set<string>();
+    for (const slot of newSlots) {
+      if (seen.has(slot)) {
+        toast.error(`تتعارض الحصص: "${slot}" مكررة في نفس المجموعة`);
+        return false;
+      }
+      seen.add(slot);
+    }
+
+    const currentGroupId = editingGroup?._id || editingGroup?.id;
+    for (const group of groups) {
+      if (currentGroupId && (group._id === currentGroupId || group.id === currentGroupId)) {
+        continue;
+      }
+      const existingSlots = group.scheduleDays || [];
+      for (const newSlot of newSlots) {
+        if (existingSlots.includes(newSlot)) {
+          const conflictingGroup = group.title || "مجموعة أخرى";
+          toast.error(`تعارض في الموعد: "${newSlot}" موجود بالفعل في "${conflictingGroup}"`);
+          return false;
+        }
+      }
+    }
+
+    for (const newSlot of newSlots) {
+      const [newDay, newTime] = newSlot.split(" ");
+      const [newHours, newMinutes] = newTime.split(":").map(Number);
+      const newTotalMinutes = (newHours || 0) * 60 + (newMinutes || 0);
+
+      for (const group of groups) {
+        if (currentGroupId && (group._id === currentGroupId || group.id === currentGroupId)) {
+          continue;
+        }
+        const existingSlots = group.scheduleDays || [];
+        for (const existingSlot of existingSlots) {
+          const [existingDay, existingTime] = existingSlot.split(" ");
+          if (newDay !== existingDay) continue;
+
+          const [existingHours, existingMinutes] = existingTime.split(":").map(Number);
+          const existingTotalMinutes = (existingHours || 0) * 60 + (existingMinutes || 0);
+          const diff = Math.abs(newTotalMinutes - existingTotalMinutes);
+
+          if (diff < 120) {
+            const conflictingGroup = group.title || "مجموعة أخرى";
+            toast.error(`يجب أن يكون الفارق بين الحصص في نفس اليوم ساعتين على الأقل. "${newTime}" قريب جداً من "${existingTime}" في "${conflictingGroup}"`);
+            return false;
+          }
+        }
+      }
+    }
+
     return true;
   };
 
@@ -742,6 +797,10 @@ export default function TeacherGroupsPage() {
                     <Wallet className="w-4 h-4 text-emerald-500" />
                     <span className="text-muted-foreground">سعر الحصة:</span>
                     <span className="font-semibold">{group.totalSessionPrice} ج.م</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">حصة المعلم:</span>
+                    <span className="font-semibold text-green-600">{group.priceTeacherShare || Math.round(group.totalSessionPrice * (1 - settings.platformFeePercentage / 100))} ج.م</span>
                   </div>
                 </div>
 

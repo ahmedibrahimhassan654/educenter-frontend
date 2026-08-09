@@ -75,10 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         cachedUser = null;
         clearAuth();
-
-        if (!isLoginPage && !isRegisterPage) {
-          router.push("/login");
-        }
       } finally {
         setIsLoading(false);
       }

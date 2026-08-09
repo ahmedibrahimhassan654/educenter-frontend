@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import api, { clearCache } from "@/lib/api";
 import { iconChip, iconColor } from "@/lib/icon-styles";
 import {
   DollarSign,
@@ -97,6 +97,8 @@ export default function AdminSettingsPage() {
         platformFeePercentage: settings.platformFeePercentage,
         socialLinks: settings.socialLinks,
       });
+      clearCache("/admin/settings");
+      await fetchSettings();
       toast.success("تم حفظ الإعدادات بنجاح");
     } catch (error: unknown) {
       const message =
@@ -115,6 +117,8 @@ export default function AdminSettingsPage() {
       await api.put("/admin/settings", {
         socialLinks: settings.socialLinks,
       });
+      clearCache("/admin/settings");
+      await fetchSettings();
       setSocialSaved(true);
       setTimeout(() => setSocialSaved(false), 3000);
       toast.success("تم حفظ روابط السوشيال ميديا بنجاح");

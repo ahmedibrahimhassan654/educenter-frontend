@@ -106,8 +106,13 @@ export default function GroupDetailPage() {
     })
     .filter(Boolean) as Array<{ code: string; stage: string; grade: string; subject: string }>;
 
+  // Filter to only show curriculum matching this group's subject and grade
+  const groupRelevantCurriculum = parsedCurriculum.filter(
+    (item) => group && item.subject === group.subject && item.grade === group.grade
+  );
+
   // Group by stage → grade
-  const curriculumByStage = parsedCurriculum.reduce((acc, item) => {
+  const curriculumByStage = groupRelevantCurriculum.reduce((acc, item) => {
     if (!acc[item.stage]) acc[item.stage] = {};
     if (!acc[item.stage][item.grade]) acc[item.stage][item.grade] = [];
     acc[item.stage][item.grade].push(item.subject);
