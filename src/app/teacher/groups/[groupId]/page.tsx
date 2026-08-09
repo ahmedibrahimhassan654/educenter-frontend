@@ -208,13 +208,6 @@ export default function GroupDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href={`/teacher/groups/${group.id}/attendance`}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors"
-            >
-              <Calendar className="w-4 h-4" />
-              الحضور
-            </Link>
             {canModify && (
               <button
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
