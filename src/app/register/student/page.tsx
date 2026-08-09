@@ -19,9 +19,9 @@ import {
   Trophy,
   Shield,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { useAuth } from "@/components/auth-provider";
 
 const benefits = [
   { icon: BookOpen, text: "مجموعات صغيرة حتى ٢٠ طالب" },
@@ -38,6 +38,7 @@ const steps = [
 
 export default function StudentRegisterPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -86,57 +87,41 @@ export default function StudentRegisterPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-
-      // Register with Supabase
-      const { data, error: authError } = await supabase.auth.signUp({
+      const response = await api.post("/auth/register", {
+        name: formData.name,
         email: formData.email,
+        phone: formData.phone,
         password: formData.password,
-        options: {
-          data: {
-            name: formData.name,
-            phone: formData.phone,
-            role: "STUDENT",
-          },
-        },
+        role: "STUDENT",
       });
 
-      if (authError) {
-        if (authError.message.includes("already registered")) {
-          toast.error("البريد الإلكتروني مسجل بالفعل");
-        } else {
-          toast.error(authError.message || "حدث خطأ أثناء التسجيل");
-        }
+      if (!response.data?.token || !response.data?.user) {
+        toast.error("حدث خطأ أثناء التسجيل");
         setLoading(false);
         return;
       }
 
-      if (data.user) {
-        // Create user profile in MongoDB
-        try {
-          // Email is resolved server-side from Supabase, not sent by the client
-          await api.post("/auth/register", {
-            supabaseId: data.user.id,
-            name: formData.name,
-            phone: formData.phone,
-            role: "STUDENT",
-          });
+      const { token, user } = response.data;
 
-          toast.success("تم إنشاء الحساب بنجاح!", {
-            description: "مرحباً بك في إديو سنتر. يمكنك الآن تسجيل الدخول.",
-            duration: 5000,
-          });
+      login(token, user);
 
-          setTimeout(() => {
-            router.push("/login");
-          }, 2000);
-        } catch {
-          toast.success("تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول.");
-          router.push("/login");
-        }
-      }
-    } catch {
-      toast.error("حدث خطأ غير متوقع. حاول مرة أخرى.");
+      toast.success("تم إنشاء الحساب بنجاح!", {
+        description: "مرحباً بك في إديو سنتر.",
+        duration: 3000,
+      });
+
+      const redirectTarget = user.role === "TEACHER" && user.verificationStatus !== "VERIFIED"
+        ? "/teacher/verification"
+        : "/student";
+
+      setTimeout(() => {
+        router.push(redirectTarget);
+        router.refresh();
+      }, 1500);
+    } catch (error: any) {
+      console.error("Registration error:", error?.response?.data || error?.message || error);
+      const message = error?.response?.data?.message || "حدث خطأ غير متوقع. حاول مرة أخرى.";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

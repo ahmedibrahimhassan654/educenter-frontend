@@ -21,9 +21,9 @@ import {
   Wallet,
   Shield,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { useAuth } from "@/components/auth-provider";
 
 const benefits = [
   { icon: Calendar, text: "إدارة ذكية للجداول والحصص" },
@@ -34,12 +34,13 @@ const benefits = [
 
 const steps = [
   { step: 1, title: "إنشاء الحساب", description: "أدخل بياناتك الأساسية" },
-  { step: 2, title: "التحقق", description: "تحقق من بريدك الإلكتروني" },
+  { step: 2, title: "التحقق", description: "قدّم مستندات التحقق" },
   { step: 3, title: "ابدأ التدريس", description: "أنشئ مجموعاتك الأولى" },
 ];
 
 export default function TeacherRegisterPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -88,57 +89,37 @@ export default function TeacherRegisterPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-
-      // Register with Supabase
-      const { data, error: authError } = await supabase.auth.signUp({
+      const response = await api.post("/auth/register", {
+        name: formData.name,
         email: formData.email,
+        phone: formData.phone,
         password: formData.password,
-        options: {
-          data: {
-            name: formData.name,
-            phone: formData.phone,
-            role: "TEACHER",
-          },
-        },
+        role: "TEACHER",
       });
 
-      if (authError) {
-        if (authError.message.includes("already registered")) {
-          toast.error("البريد الإلكتروني مسجل بالفعل");
-        } else {
-          toast.error(authError.message || "حدث خطأ أثناء التسجيل");
-        }
+      if (!response.data?.token || !response.data?.user) {
+        toast.error("حدث خطأ أثناء التسجيل");
         setLoading(false);
         return;
       }
 
-      if (data.user) {
-        // Create user profile in MongoDB
-        try {
-          // Email is resolved server-side from Supabase, not sent by the client
-          await api.post("/auth/register", {
-            supabaseId: data.user.id,
-            name: formData.name,
-            phone: formData.phone,
-            role: "TEACHER",
-          });
+      const { token, user } = response.data;
 
-          toast.success("تم إنشاء الحساب بنجاح!", {
-            description: "مرحباً بك في إديو سنتر. يمكنك الآن تسجيل الدخول.",
-            duration: 5000,
-          });
+      login(token, user);
 
-          setTimeout(() => {
-            router.push("/login");
-          }, 2000);
-        } catch {
-          toast.success("تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول.");
-          router.push("/login");
-        }
-      }
-    } catch {
-      toast.error("حدث خطأ غير متوقع. حاول مرة أخرى.");
+      toast.success("تم إنشاء الحساب بنجاح!", {
+        description: "مرحباً بك في إديو سنتر. يرجى إكمال خطوات التحقق.",
+        duration: 3000,
+      });
+
+      setTimeout(() => {
+        router.push("/teacher/verification");
+        router.refresh();
+      }, 1500);
+    } catch (error: any) {
+      console.error("Registration error:", error?.response?.data || error?.message || error);
+      const message = error?.response?.data?.message || "حدث خطأ غير متوقع. حاول مرة أخرى.";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

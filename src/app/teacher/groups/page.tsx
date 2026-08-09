@@ -369,13 +369,24 @@ export default function TeacherGroupsPage() {
     return (group.studentsCount || 0) === 0;
   };
 
-  const platformFeeAmount = Math.round(
-    (settings.defaultPricePerLecture * settings.platformFeePercentage) / 100
-  );
-  const teacherShare = settings.defaultPricePerLecture - platformFeeAmount;
+  const platformFeeAmount = editingGroup
+    ? (editingGroup.platformFee || Math.round((settings.defaultPricePerLecture * settings.platformFeePercentage) / 100))
+    : Math.round((settings.defaultPricePerLecture * settings.platformFeePercentage) / 100);
+  const teacherShare = editingGroup
+    ? (editingGroup.priceTeacherShare || settings.defaultPricePerLecture - platformFeeAmount)
+    : (settings.defaultPricePerLecture - platformFeeAmount);
+  const currentMaxStudents = editingGroup
+    ? (editingGroup.maxStudentsPerGroup || settings.maxStudentsPerGroup)
+    : settings.maxStudentsPerGroup;
+  const currentPricePerLecture = editingGroup
+    ? (editingGroup.totalSessionPrice || settings.defaultPricePerLecture)
+    : settings.defaultPricePerLecture;
 
   const totalStudents = groups.reduce((sum, g) => sum + (g.studentsCount || 0), 0);
   const totalCapacity = groups.reduce((sum, g) => sum + (g.maxStudentsPerGroup || settings.maxStudentsPerGroup), 0);
+  const avgPricePerLecture = groups.length > 0
+    ? Math.round(groups.reduce((sum, g) => sum + (g.totalSessionPrice || settings.defaultPricePerLecture), 0) / groups.length)
+    : settings.defaultPricePerLecture;
 
   if (loading) {
     return (
@@ -444,24 +455,24 @@ export default function TeacherGroupsPage() {
               <Wallet className="w-5 h-5 text-emerald-500" />
               <h3 className="font-bold">كيف تكسب المال؟</h3>
             </div>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between items-center p-2.5 bg-muted/50 rounded-lg">
-                <span className="text-muted-foreground">سعر الحصة / طالب</span>
-                <span className="font-bold text-primary">{settings.defaultPricePerLecture} ج.م</span>
-              </div>
-              <div className="flex justify-between items-center p-2.5 bg-muted/50 rounded-lg">
-                <span className="text-muted-foreground">حصة المعلم</span>
-                <span className="font-bold text-green-600">{teacherShare} ج.م</span>
-              </div>
-              <div className="flex justify-between items-center p-2.5 bg-muted/50 rounded-lg">
-                <span className="text-muted-foreground">عمولة المنصة</span>
-                <span className="font-semibold text-orange-500">{platformFeeAmount} ج.م</span>
-              </div>
-              <div className="flex justify-between items-center p-2.5 bg-green-500/10 rounded-lg border border-green-500/20">
-                <span className="text-muted-foreground">أرباحك / مجموعة مكتملة</span>
-                <span className="font-bold text-green-600 text-base">{teacherShare * settings.maxStudentsPerGroup} ج.م</span>
-              </div>
-            </div>
+             <div className="space-y-3 text-sm">
+               <div className="flex justify-between items-center p-2.5 bg-muted/50 rounded-lg">
+                 <span className="text-muted-foreground">سعر الحصة / طالب</span>
+                 <span className="font-bold text-primary">{currentPricePerLecture} ج.م</span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-muted/50 rounded-lg">
+                 <span className="text-muted-foreground">حصة المعلم</span>
+                 <span className="font-bold text-green-600">{teacherShare} ج.م</span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-muted/50 rounded-lg">
+                 <span className="text-muted-foreground">عمولة المنصة</span>
+                 <span className="font-semibold text-orange-500">{platformFeeAmount} ج.م</span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-green-500/10 rounded-lg border border-green-500/20">
+                 <span className="text-muted-foreground">أرباحك / مجموعة مكتملة</span>
+                 <span className="font-bold text-green-600 text-base">{teacherShare * currentMaxStudents} ج.م</span>
+               </div>
+             </div>
             <p className="text-xs text-muted-foreground">
               تحسب أرباحك بناءً على عدد الحصص المنتهية وعدد الحاضرين فيها
             </p>
@@ -600,7 +611,7 @@ export default function TeacherGroupsPage() {
               <Users className={`w-5 h-5 ${iconColor.alert}`} />
             </div>
             <div>
-              <p className="text-2xl font-bold">{settings.maxStudentsPerGroup}</p>
+              <p className="text-2xl font-bold">{currentMaxStudents}</p>
               <p className="text-sm text-muted-foreground">السعة القصوى / مجموعة</p>
             </div>
           </div>
@@ -833,7 +844,7 @@ export default function TeacherGroupsPage() {
               </div>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {renderModalContent(formData, setFormData, settings, platformFeeAmount, teacherShare, availableStages, availableGrades, availableSubjects, daysOfWeek, submitting, editingGroup, hasProfileCurriculum)}
+              {renderModalContent(formData, setFormData, settings, availableStages, availableGrades, availableSubjects, daysOfWeek, submitting, editingGroup, hasProfileCurriculum)}
             </form>
           </div>
         </div>
@@ -846,8 +857,6 @@ function renderModalContent(
   formData: FormData,
   setFormData: React.Dispatch<React.SetStateAction<FormData>>,
   settings: PlatformSettings,
-  platformFeeAmount: number,
-  teacherShare: number,
   availableStages: string[],
   availableGrades: string[],
   availableSubjects: string[],
@@ -856,6 +865,15 @@ function renderModalContent(
   editingGroup: Group | null,
   hasProfileCurriculum: boolean
 ) {
+  const currentPricePerLecture = editingGroup
+    ? (editingGroup.totalSessionPrice || settings.defaultPricePerLecture)
+    : settings.defaultPricePerLecture;
+  const currentMaxStudents = editingGroup
+    ? (editingGroup.maxStudentsPerGroup || settings.maxStudentsPerGroup)
+    : settings.maxStudentsPerGroup;
+  const platformFeeAmount = Math.round((currentPricePerLecture * settings.platformFeePercentage) / 100);
+  const teacherShare = currentPricePerLecture - platformFeeAmount;
+
   return (
     <>
       {/* Stage */}
@@ -1069,11 +1087,11 @@ function renderModalContent(
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">سعر الحصة / طالب</span>
-            <span className="font-semibold">{settings.defaultPricePerLecture} ج.م</span>
+            <span className="font-semibold">{currentPricePerLecture} ج.م</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">السعة القصوى</span>
-            <span className="font-semibold">{settings.maxStudentsPerGroup} طالب</span>
+            <span className="font-semibold">{currentMaxStudents} طالب</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">حصة المعلم</span>

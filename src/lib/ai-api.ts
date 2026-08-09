@@ -282,20 +282,22 @@ export async function streamChat(
   onChunk: (chunk: string) => void,
   onError?: (error: string) => void
 ): Promise<string> {
-  const { createClient } = await import("./supabase/client");
-  const supabase = createClient();
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
+  const { getStoredToken } = await import("./api");
+  const token = getStoredToken();
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   try {
     const response = await fetch(`${apiUrl}/ai/chat`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify({ contentId, messages }),
     });
 

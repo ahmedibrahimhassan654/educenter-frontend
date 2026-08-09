@@ -291,6 +291,7 @@ export default function AdminUsersPage() {
         await api.put(`/users/${selectedUser._id}`, formData);
         toast.success("تم تحديث المستخدم بنجاح");
       }
+      clearCache("/users");
       await fetchUsers(true);
       await fetchStats();
       setFormData({ name: "", email: "", phone: "", role: "STUDENT", password: "" });
@@ -310,6 +311,7 @@ export default function AdminUsersPage() {
     try {
       await api.delete(`/users/${userId}`);
       toast.success("تم حذف المستخدم بنجاح");
+      clearCache("/users");
       await fetchUsers(true);
       await fetchStats();
       setShowDeleteConfirm(null);

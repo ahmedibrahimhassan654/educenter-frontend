@@ -10,7 +10,6 @@ export type VerificationStatus = "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTE
 export interface User {
   id: string;
   _id?: string;
-  supabaseId: string;
   name: string;
   email: string;
   phone: string;

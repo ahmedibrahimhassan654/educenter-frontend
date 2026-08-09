@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth-provider";
-import { createClient } from "@/lib/supabase/client";
 import api from "@/lib/api";
 import { getErrorMessage } from "@/lib/utils";
 import { iconColor } from "@/lib/icon-styles";
@@ -109,7 +108,7 @@ function parseCurriculumEntry(entry: string): ParsedCurriculum {
 
 
 export default function TeacherProfilePage() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, updateUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -264,37 +263,26 @@ export default function TeacherProfilePage() {
 
     setIsUploading(true);
     try {
-      const supabase = createClient();
       const userId = user?._id || user?.id;
-      
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${userId}-${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      // Never fall back to storing base64 in the database: it bloats every
-      // record and slows down all authenticated requests.
-      if (uploadError?.message?.includes("Bucket not found")) {
-        console.error('Supabase Storage bucket "avatars" is missing');
-        toast.error("تعذر رفع الصورة: مساحة التخزين غير مهيأة. تواصل مع الدعم.");
+      if (!userId) {
+        toast.error("لم يتم العثور على معرف المستخدم");
         return;
       }
 
-      if (uploadError) throw uploadError;
+      const formData = new FormData();
+      formData.append("avatar", file);
 
-      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
-      const newAvatarUrl = urlData.publicUrl;
+      const response = await api.post("/users/upload-avatar", formData);
 
-      await api.put(`/users/${userId}`, { avatarUrl: newAvatarUrl });
-      setAvatarUrl(newAvatarUrl);
-      await refreshUser();
-      toast.success("تم تحديث الصورة الشخصية بنجاح");
+      const newAvatarUrl = response.data?.avatarUrl;
+      if (newAvatarUrl) {
+        setAvatarUrl(newAvatarUrl);
+        const updatedUser = response.data?.user;
+        if (updatedUser) {
+          updateUser(updatedUser);
+        }
+        toast.success("تم تحديث الصورة الشخصية بنجاح");
+      }
     } catch (error) {
       console.error("Error uploading image:", error);
       toast.error(getErrorMessage(error, "حدث خطأ أثناء رفع الصورة"));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -16,9 +16,9 @@ import {
   Star,
   Loader2,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import api, { clearAuthCache, setCachedSession } from "@/lib/api";
+import api from "@/lib/api";
+import { useAuth } from "@/components/auth-provider";
 
 const features = [
   { icon: GraduationCap, text: "أفضل المعلمين المعتمدين" },
@@ -36,6 +36,7 @@ const roleRedirects: Record<string, string> = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -48,59 +49,63 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const supabase = createClient();
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const response = await api.post("/auth/login", { email, password });
 
-      if (authError) {
+      if (!response.data?.user) {
         setError("البريد الإلكتروني أو كلمة المرور غير صحيحة");
         setLoading(false);
         return;
       }
 
-      if (data.user) {
-        // Drop any cached session/response from a previous identity, then seed
-        // the session we just received so the next call needs no auth round-trip
-        clearAuthCache();
-        if (data.session) {
-          setCachedSession(data.session);
-        }
+      const { user } = response.data;
 
-        // Fetch user profile from MongoDB to get role
-        try {
-          const response = await api.get("/auth/me");
-          const userRole = response.data?.role;
-          const verificationStatus = response.data?.verificationStatus;
+      login(user);
 
-          const redirectTarget = roleRedirects[userRole];
-          if (!redirectTarget) {
-            setError("تعذر تحديد نوع الحساب. يرجى المحاولة مرة أخرى.");
-            setLoading(false);
-            return;
-          }
-
-          // Redirect unverified teachers to verification page
-          let redirectPath = redirectTarget;
-          if (userRole === "TEACHER" && verificationStatus !== "VERIFIED") {
-            redirectPath = "/teacher/verification";
-          }
-
-          toast.success("تم تسجيل الدخول بنجاح", {
-            description: `مرحباً بعودتك!`,
-            duration: 3000,
-          });
-
-          router.replace(redirectPath);
-          router.refresh();
-        } catch {
-          setError("تعذر تحميل بيانات حسابك. يرجى المحاولة مرة أخرى.");
-          setLoading(false);
-        }
+      const redirectTarget = roleRedirects[user.role];
+      if (!redirectTarget) {
+        setError("تعذر تحديد نوع الحساب. يرجى المحاولة مرة أخرى.");
+        setLoading(false);
+        return;
       }
-    } catch {
-      setError("حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى.");
+
+      let redirectPath = redirectTarget;
+      if (user.role === "TEACHER" && user.verificationStatus !== "VERIFIED") {
+        redirectPath = "/teacher/verification";
+      }
+
+      toast.success("تم تسجيل الدخول بنجاح", {
+        description: `مرحباً بعودتك!`,
+        duration: 3000,
+      });
+
+      router.replace(redirectPath);
+      router.refresh();
+    } catch (error: any) {
+      console.error("handleLogin error:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        config: error?.config,
+        code: error?.code,
+      });
+
+      let message = "حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى.";
+      
+      if (error?.code === "ECONNREFUSED" || error?.code === "ERR_NETWORK") {
+        message = "لا يمكن الاتصال بالخادم. تأكد من تشغيل الخادم الخلفي.";
+      } else if (error?.response?.status === 401) {
+        message = "البريد الإلكتروني أو كلمة المرور غير صحيحة";
+      } else if (error?.response?.status === 400) {
+        message = error?.response?.data?.message || "بيانات غير صالحة";
+      } else if (error?.response?.status === 500) {
+        message = "خطأ في الخادم. حاول مرة أخرى لاحقاً";
+      } else if (error?.response?.data?.message) {
+        message = error.response.data.message;
+      } else if (error?.message) {
+        message = error.message;
+      }
+
+      setError(message);
       setLoading(false);
     }
   };

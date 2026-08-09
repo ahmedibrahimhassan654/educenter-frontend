@@ -103,6 +103,7 @@ export default function RootLayout({
           geistSans.variable,
           geistMono.variable
         )}
+        suppressHydrationWarning
       >
         <JsonLd data={generateOrganizationSchema()} />
         <JsonLd data={generateWebsiteSchema()} />

@@ -1,48 +1,43 @@
 import axios from "axios";
-import { createClient } from "@/lib/supabase/client";
-import { Session } from "@supabase/supabase-js";
+import { User } from "@/types";
 
-// Singleton Supabase client for browser
-let supabaseClient: ReturnType<typeof createClient> | null = null;
-
-function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient();
-  }
-  return supabaseClient;
-}
+const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-  // Add timeout to prevent hanging requests.
-  // Generous enough for verification documents, which are stored as base64
-  // data URIs and can be several hundred KB each.
+  baseURL,
   timeout: 60000,
+  withCredentials: true,
 });
 
-// Cache the session to avoid repeated calls
-let cachedSession: Session | null = null;
-let sessionExpiry = 0;
+const TOKEN_KEY = "educenter_token";
+const USER_KEY = "educenter_user";
 
-async function getCachedSession() {
-  const now = Date.now();
-  if (cachedSession && now < sessionExpiry) {
-    return cachedSession;
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function getStoredUser(): User | null {
+  if (typeof window === "undefined") return null;
+  const userStr = localStorage.getItem(USER_KEY);
+  if (!userStr) return null;
+  try {
+    return JSON.parse(userStr) as User;
+  } catch {
+    return null;
   }
-  
-  const supabase = getSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (session) {
-    cachedSession = session;
-    // Cache for 5 minutes
-    sessionExpiry = now + 5 * 60 * 1000;
-  }
-  
-  return session;
+}
+
+export function setAuth(token: string, user: User): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function clearAuth(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
 }
 
 // API Response Cache
@@ -55,10 +50,7 @@ const responseCache = new Map<string, CacheEntry>();
 const CACHE_DURATION = 30 * 1000; // 30 seconds for GET requests
 const LONG_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for rarely changing data
 
-// Endpoints that can be cached longer
 const longCacheEndpoints = ["/curriculum", "/groups?explore=true"];
-
-// Auth endpoints must never be cached - stale role data breaks redirects
 const neverCacheEndpoints = ["/auth/"];
 
 function getCacheKey(config: {
@@ -66,7 +58,6 @@ function getCacheKey(config: {
   url?: string;
   params?: unknown;
 }): string | null {
-  // Only cache GET requests
   if (config.method !== "get") return null;
 
   const url = config.url || "";
@@ -77,33 +68,17 @@ function getCacheKey(config: {
 }
 
 function getCacheDuration(url: string): number {
-  return longCacheEndpoints.some(endpoint => url.includes(endpoint)) 
-    ? LONG_CACHE_DURATION 
+  return longCacheEndpoints.some((endpoint) => url.includes(endpoint))
+    ? LONG_CACHE_DURATION
     : CACHE_DURATION;
 }
 
-// Add auth token to requests
+// Cache interceptor (no auth header needed - cookies sent automatically)
 api.interceptors.request.use(async (config) => {
-  const session = await getCachedSession();
-
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
-  }
-
-  // Let the browser set multipart/form-data itself so it can append the
-  // boundary. `delete` is not enough: axios then falls back to the instance
-  // default (application/json), and an explicitly passed "multipart/form-data"
-  // would be sent with no boundary. Setting null makes axios omit the header.
-  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
-    config.headers.setContentType(null);
-  }
-
-  // Check cache for GET requests
   const cacheKey = getCacheKey(config);
   if (cacheKey) {
     const cached = responseCache.get(cacheKey);
     if (cached && Date.now() < cached.expiry) {
-      // Return cached response
       return Promise.reject({
         __cached: true,
         data: cached.data,
@@ -118,7 +93,6 @@ api.interceptors.request.use(async (config) => {
 // Handle response errors
 api.interceptors.response.use(
   (response) => {
-    // Cache successful GET responses
     const cacheKey = getCacheKey(response.config);
     if (cacheKey) {
       const duration = getCacheDuration(response.config.url || "");
@@ -130,7 +104,6 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    // Handle cached responses
     if (error.__cached) {
       return Promise.resolve({
         data: error.data,
@@ -142,18 +115,10 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      // Clear cached session on 401
-      cachedSession = null;
-      sessionExpiry = 0;
-      // Clear all response cache on auth error
+      clearAuth();
       responseCache.clear();
-      
-      const supabase = getSupabaseClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
 
-      if (!session) {
+      if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
     }
@@ -161,52 +126,12 @@ api.interceptors.response.use(
   }
 );
 
-// Clear every cached artifact tied to the current identity
-export function clearAuthCache() {
-  cachedSession = null;
-  sessionExpiry = 0;
-  responseCache.clear();
-}
-
-/**
- * Prime the session cache from a session the caller already holds, avoiding a
- * getSession() call that could contend with supabase-js's auth lock.
- */
-export function setCachedSession(session: Session) {
-  cachedSession = session;
-  sessionExpiry = Date.now() + 5 * 60 * 1000;
-}
-
-// Keep caches in sync with the Supabase auth lifecycle.
-// This callback stays synchronous and never calls back into supabase-js:
-// doing so would deadlock the client's auth lock.
-if (typeof window !== "undefined") {
-  getSupabaseClient().auth.onAuthStateChange((event, session) => {
-    if (
-      event === "SIGNED_IN" ||
-      event === "SIGNED_OUT" ||
-      event === "TOKEN_REFRESHED" ||
-      event === "USER_UPDATED"
-    ) {
-      clearAuthCache();
-
-      // Seed the cache straight from the event so the next request does not
-      // need to call getSession() while the lock may still be held
-      if (session) {
-        cachedSession = session;
-        sessionExpiry = Date.now() + 5 * 60 * 1000;
-      }
-    }
-  });
-}
-
-// Helper to clear cache for specific endpoints
 export function clearCache(pattern?: string) {
   if (!pattern) {
     responseCache.clear();
     return;
   }
-  
+
   for (const key of Array.from(responseCache.keys())) {
     if (key.includes(pattern)) {
       responseCache.delete(key);

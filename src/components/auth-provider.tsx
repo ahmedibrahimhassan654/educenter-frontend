@@ -1,133 +1,137 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { usePathname, useRouter } from "next/navigation";
 import { User } from "@/types";
-import api, { clearAuthCache } from "@/lib/api";
+import api, { getStoredUser, clearAuth } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  login: (user: User) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUser: (userData: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   isAuthenticated: false,
+  login: () => {},
   logout: async () => {},
   refreshUser: async () => {},
+  updateUser: () => {},
 });
 
-// Cache user data to avoid repeated API calls
 let cachedUser: User | null = null;
 let userCacheExpiry = 0;
 const USER_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(cachedUser);
-  const [isLoading, setIsLoading] = useState(!cachedUser);
+  const [isLoading, setIsLoading] = useState(!cachedUser && !!getStoredUser());
+  const isLoginPage = pathname?.startsWith("/login") ?? false;
+  const isRegisterPage = pathname?.startsWith("/register") ?? false;
 
-  /**
-   * Load the profile for an already-authenticated user.
-   *
-   * `skipAuthCheck` is used when the caller already knows a session exists
-   * (e.g. from an onAuthStateChange payload) so we avoid calling back into
-   * supabase-js, which would deadlock inside its auth lock.
-   */
   const fetchUser = useCallback(
-    async (forceRefresh = false, skipAuthCheck = false) => {
-      // Use cache if available and not forcing refresh
+    async (forceRefresh = false) => {
+      if (isLoginPage || isRegisterPage) {
+        setUser(null);
+        cachedUser = null;
+        userCacheExpiry = 0;
+        setIsLoading(false);
+        return;
+      }
+
       if (!forceRefresh && cachedUser && Date.now() < userCacheExpiry) {
         setUser(cachedUser);
         setIsLoading(false);
         return;
       }
 
-      try {
-        let hasSession = skipAuthCheck;
-
-        if (!skipAuthCheck) {
-          const supabase = createClient();
-          const { data, error } = await supabase.auth.getUser();
-          if (error) {
-            console.error("Supabase getUser error:", error.message, error);
-          }
-          hasSession = !!data.user;
-        }
-
-        if (hasSession) {
-          try {
-            const response = await api.get("/auth/me");
-            const userData = response.data;
-
-            // Update cache
-            cachedUser = userData;
-            userCacheExpiry = Date.now() + USER_CACHE_DURATION;
-
-            setUser(userData);
-          } catch (apiError: any) {
-            console.error("API /auth/me error:", apiError?.response?.data || apiError?.message || apiError);
-            setUser(null);
-            cachedUser = null;
-          }
-        } else {
-          setUser(null);
-          cachedUser = null;
-        }
-      } catch (err: any) {
-        console.error("fetchUser outer catch:", err?.message || err);
+      const storedUser = getStoredUser();
+      if (!storedUser) {
         setUser(null);
         cachedUser = null;
+        userCacheExpiry = 0;
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await api.get("/auth/me");
+        const userData = response.data;
+
+        cachedUser = userData;
+        userCacheExpiry = Date.now() + USER_CACHE_DURATION;
+
+        setUser(userData);
+      } catch (apiError: any) {
+        console.error("API /auth/me error:", apiError?.response?.data || apiError?.message || apiError);
+        setUser(null);
+        cachedUser = null;
+        clearAuth();
+
+        if (!isLoginPage && !isRegisterPage) {
+          router.push("/login");
+        }
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [isLoginPage, isRegisterPage, router]
   );
 
   useEffect(() => {
+    if (!pathname) {
+      return;
+    }
+
+    if (isLoginPage || isRegisterPage) {
+      setUser(null);
+      cachedUser = null;
+      userCacheExpiry = 0;
+      setIsLoading(false);
+      return;
+    }
+
     fetchUser();
+  }, [fetchUser, pathname]);
 
-    const supabase = createClient();
-    // The callback must stay synchronous: supabase-js invokes it while holding
-    // its auth lock, so awaiting another auth call here deadlocks the client
-    // and every subsequent request silently hangs.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-          // Defer past the lock, and trust the session from the event payload
-          setTimeout(() => {
-            void fetchUser(true, !!session);
-          }, 0);
-        } else if (event === "SIGNED_OUT") {
-          setUser(null);
-          cachedUser = null;
-          userCacheExpiry = 0;
-          setIsLoading(false);
-        }
-      }
-    );
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [fetchUser]);
+  const login = useCallback((userData: User) => {
+    cachedUser = userData;
+    userCacheExpiry = Date.now() + USER_CACHE_DURATION;
+    setUser(userData);
+    setIsLoading(false);
+  }, []);
 
   const logout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      await api.post("/auth/logout");
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+    clearAuth();
     cachedUser = null;
     userCacheExpiry = 0;
-    clearAuthCache();
+    setUser(null);
+    setIsLoading(false);
+    router.push("/login");
   };
 
   const refreshUser = useCallback(async () => {
     await fetchUser(true);
   }, [fetchUser]);
+
+  const updateUser = useCallback((userData: User) => {
+    cachedUser = userData;
+    userCacheExpiry = Date.now() + USER_CACHE_DURATION;
+    setUser(userData);
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -135,8 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated: !!user,
+        login,
         logout,
         refreshUser,
+        updateUser,
       }}
     >
       {children}

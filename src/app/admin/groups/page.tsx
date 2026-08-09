@@ -54,7 +54,7 @@ export default function AdminGroupsPage() {
   const fetchGroups = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get("/admin/groups");
+      const res = await api.get("/groups/admin/all");
       setGroups(res.data?.data || []);
     } catch {
       toast.error("فشل في تحميل المجموعات");

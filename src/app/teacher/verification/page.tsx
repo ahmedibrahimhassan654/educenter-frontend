@@ -47,7 +47,7 @@ const documentTypes = [
 ];
 
 export default function TeacherVerificationPage() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, updateUser } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [curriculum, setCurriculum] = useState<Curriculum[]>([]);
@@ -62,6 +62,8 @@ export default function TeacherVerificationPage() {
   });
   
   const [documents, setDocuments] = useState<Record<string, UploadedDocument>>({});
+  const [signedDocumentUrls, setSignedDocumentUrls] = useState<string[]>([]);
+  const [isLoadingSignedDocs, setIsLoadingSignedDocs] = useState(false);
 
   const verificationStatus = user?.verificationStatus || "PENDING";
   const [isResubmitting, setIsResubmitting] = useState(false);
@@ -73,6 +75,7 @@ export default function TeacherVerificationPage() {
         setCurriculum(response.data);
       } catch (error) {
         console.error("Error fetching curriculum:", error);
+        toast.error("فشل في تحميل المناهج الدراسية");
       } finally {
         setLoadingCurriculum(false);
       }
@@ -111,6 +114,36 @@ export default function TeacherVerificationPage() {
       router.push("/teacher");
     }
   }, [verificationStatus, router]);
+
+  // Load signed document URLs when viewing submitted status
+  useEffect(() => {
+    if (verificationStatus !== "SUBMITTED") return;
+
+    let cancelled = false;
+    const fetchSignedDocuments = async () => {
+      setIsLoadingSignedDocs(true);
+      try {
+        const response = await api.get("/verification/my-documents");
+        const urls = response.data?.data?.documents || [];
+        if (!cancelled) {
+          setSignedDocumentUrls(urls);
+        }
+      } catch {
+        if (!cancelled) {
+          setSignedDocumentUrls([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingSignedDocs(false);
+        }
+      }
+    };
+
+    fetchSignedDocuments();
+    return () => {
+      cancelled = true;
+    };
+  }, [verificationStatus]);
 
   const handleCurriculumToggle = (uniqueKey: string, subjectName: string) => {
     setFormData((prev) => {
@@ -230,14 +263,27 @@ export default function TeacherVerificationPage() {
     try {
       const documentUrls = Object.values(documents).map((doc) => doc.url);
       
-      await api.post("/verification/submit", {
+      const response = await api.post("/verification/submit", {
         experience: formData.experience,
         curriculum: formData.selectedCurriculum,
         bio: formData.bio,
         documents: documentUrls,
       });
 
-      await refreshUser();
+      if (user && response.data?.verificationStatus) {
+        updateUser({
+          ...user,
+          verificationStatus: response.data.verificationStatus,
+          verificationData: {
+            ...(user.verificationData || {}),
+            experience: formData.experience,
+            curriculum: formData.selectedCurriculum,
+            bio: formData.bio,
+            documents: documentUrls,
+          },
+        } as any);
+      }
+
       toast.success("تم إرسال طلب التحقق بنجاح");
     } catch (error) {
       toast.error(getErrorMessage(error, "حدث خطأ أثناء إرسال الطلب"));
@@ -329,8 +375,8 @@ export default function TeacherVerificationPage() {
                 </div>
               </div>
               <div className="space-y-4">
-                {documentTypes.map((docType) => {
-                  const uploadedDoc = documents[docType.id];
+                {documentTypes.map((docType, index) => {
+                  const signedUrl = signedDocumentUrls[index];
                   return (
                     <div key={docType.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
@@ -341,15 +387,15 @@ export default function TeacherVerificationPage() {
                           </p>
                         </div>
                       </div>
-                      {uploadedDoc ? (
+                      {signedUrl ? (
                         <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-lg">
                           <CheckCircle className="w-5 h-5 text-green-500" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-green-800 dark:text-green-300 truncate">
-                              {uploadedDoc.name}
+                              {docType.label}
                             </p>
                             <a
-                              href={uploadedDoc.url}
+                              href={signedUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-green-600 dark:text-green-400 hover:underline"
