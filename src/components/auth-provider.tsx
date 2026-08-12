@@ -3,13 +3,13 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { User } from "@/types";
-import api, { getStoredUser, clearAuth } from "@/lib/api";
+import api, { getStoredUser, clearAuth, TOKEN_KEY } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (user: User) => void;
+  login: (user: User, token?: string) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateUser: (userData: User) => void;
@@ -98,7 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchUser();
   }, [fetchUser, pathname]);
 
-  const login = useCallback((userData: User) => {
+  const login = useCallback((userData: User, token?: string) => {
+    if (token && typeof window !== "undefined") {
+      localStorage.setItem(TOKEN_KEY, token);
+    }
     cachedUser = userData;
     userCacheExpiry = Date.now() + USER_CACHE_DURATION;
     setUser(userData);

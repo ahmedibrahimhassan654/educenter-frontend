@@ -112,7 +112,7 @@ export default function StudentRegisterPage() {
 
       const redirectTarget = user.role === "TEACHER" && user.verificationStatus !== "VERIFIED"
         ? "/teacher/verification"
-        : "/student";
+        : "/student/onboarding";
 
       setTimeout(() => {
         router.push(redirectTarget);

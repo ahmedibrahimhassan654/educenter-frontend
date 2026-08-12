@@ -17,6 +17,9 @@ export interface User {
   role: "TEACHER" | "STUDENT" | "PARENT" | "ADMIN";
   parentId?: string;
   students?: string[];
+  groups?: string[];
+  stage?: string;
+  grade?: string;
   // Verification fields (for teachers)
   verificationStatus?: VerificationStatus;
   verificationData?: VerificationData;
@@ -54,7 +57,7 @@ export interface Group {
   studentsCount?: number;
   googleMeetLink: string;
   scheduleDays: string[];
-  students: string[];
+  students: Array<string | { _id?: string; id?: string; name?: string; email?: string; phone?: string }>;
   createdAt: string;
   updatedAt: string;
 }

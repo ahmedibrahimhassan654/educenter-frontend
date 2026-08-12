@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
 import {
   Search,
@@ -13,6 +14,7 @@ import {
   GraduationCap,
   Loader2,
   Users,
+  Sparkles,
 } from "lucide-react";
 
 interface Group {
@@ -20,6 +22,7 @@ interface Group {
   title: string;
   subject: string;
   grade: string;
+  stage?: string;
   teacherId: {
     name: string;
     email: string;
@@ -36,6 +39,7 @@ const stages = ["الكل", "الابتدائي", "الإعدادي", "الثا�
 const subjects = ["الكل", "رياضيات", "فيزياء", "كيمياء", "علوم", "لغة عربية", "لغة إنجليزية"];
 
 export default function StudentExplorePage() {
+  const { user } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,8 +49,8 @@ export default function StudentExplorePage() {
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const response = await api.get("/groups?explore=true");
-        setGroups(response.data);
+         const response = await api.get("/groups?explore=true");
+          setGroups(response.data?.data || response.data);
       } catch (error) {
         console.error("Error fetching groups:", error);
       } finally {
@@ -57,15 +61,46 @@ export default function StudentExplorePage() {
     fetchGroups();
   }, []);
 
+  const studentStage = user?.stage || "";
+  const studentGrade = user?.grade || "";
+
+  const getStageFromGrade = (grade: string): string => {
+    if (grade.includes("ابتدائي")) return "ابتدائي";
+    if (grade.includes("إعدادي")) return "إعدادي";
+    if (grade.includes("الثانوي")) return "الثانوي";
+    return "";
+  };
+
   const filteredGroups = groups.filter((group) => {
     const matchesSearch =
       group.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       group.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       group.teacherId?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       group.grade?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStage = selectedStage === "الكل" || group.grade?.includes(selectedStage);
-    const matchesSubject = selectedSubject === "الكل" || group.subject === selectedSubject;
-    return matchesSearch && matchesStage && matchesSubject;
+
+    let matchesStage = true;
+    let matchesGrade = true;
+    let matchesSubject = true;
+
+    if (studentStage) {
+      const groupStage = group.stage || getStageFromGrade(group.grade);
+      matchesStage = groupStage === studentStage;
+    }
+
+    if (studentGrade) {
+      matchesGrade = group.grade === studentGrade;
+    }
+
+    if (selectedSubject !== "الكل") {
+      matchesSubject = group.subject === selectedSubject;
+    }
+
+    if (selectedStage !== "الكل") {
+      const groupStage = group.stage || getStageFromGrade(group.grade);
+      matchesStage = matchesStage && groupStage === selectedStage;
+    }
+
+    return matchesSearch && matchesStage && matchesGrade && matchesSubject;
   });
 
   const getScheduleText = (days?: string[]) => {
@@ -99,8 +134,16 @@ export default function StudentExplorePage() {
         <div>
           <h2 className="text-2xl md:text-3xl font-bold">استكشف المجموعات</h2>
           <p className="text-base text-muted-foreground mt-1">
-            ابحث عن المجموعات المناسبة وانضم إليها
+            {studentStage && studentGrade
+              ? `المجموعات المناسبة لك (${studentStage} - ${studentGrade})`
+              : "ابحث عن المجموعات المناسبة وانضم إليها"}
           </p>
+          {studentStage && studentGrade && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium">
+              <Sparkles className="w-4 h-4" />
+              {studentStage} - {studentGrade}
+            </div>
+          )}
         </div>
 
         {/* Search & Filters */}

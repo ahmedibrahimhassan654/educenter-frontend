@@ -9,7 +9,7 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const TOKEN_KEY = "educenter_token";
+export const TOKEN_KEY = "educenter_token";
 const USER_KEY = "educenter_user";
 
 export function getStoredToken(): string | null {

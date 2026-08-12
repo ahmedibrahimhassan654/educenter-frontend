@@ -14,6 +14,10 @@ import {
   TrendingUp,
   CheckCircle,
   Loader2,
+  Bell,
+  Mail,
+  Check,
+  X,
 } from "lucide-react";
 
 interface Group {
@@ -32,6 +36,26 @@ interface Group {
   scheduleDays?: string;
 }
 
+interface PendingInvitation {
+  _id: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED";
+  groupId: {
+    _id: string;
+    title: string;
+    subject: string;
+    grade: string;
+    scheduleDays?: string;
+  };
+  teacherId: {
+    name: string;
+    email: string;
+  };
+  stage: string;
+  grade: string;
+  subject: string;
+  createdAt: string;
+}
+
 interface Session {
   _id: string;
   title: string;
@@ -45,20 +69,26 @@ export default function StudentDashboard() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
+  const [invitationsLoading, setInvitationsLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [groupsRes, sessionsRes] = await Promise.all([
+        const [groupsRes, sessionsRes, invitationsRes] = await Promise.all([
           api.get("/groups?limit=20"),
           api.get("/sessions?limit=20"),
+          api.get("/groups/invitations"),
         ]);
         setGroups(groupsRes.data?.data || groupsRes.data);
         setSessions(sessionsRes.data?.data || sessionsRes.data);
+        setInvitations((invitationsRes.data?.data || []).filter((inv: PendingInvitation) => inv.status === "PENDING"));
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
+        setInvitationsLoading(false);
       }
     };
 
@@ -152,6 +182,24 @@ export default function StudentDashboard() {
             </div>
           </div>
         )}
+
+        {/* Pending Invitations */}
+        <div className="bg-card border rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold flex items-center gap-2">
+              <Bell className="w-5 h-5 text-yellow-500" />
+              الدعوات الواردة
+            </h3>
+            <Link
+              href="/student/invitations"
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
+              عرض الكل
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
+          </div>
+          <PendingInvitationsWidget />
+        </div>
 
         {/* Enrolled Groups */}
         <div>
@@ -311,5 +359,108 @@ export default function StudentDashboard() {
         </div>
       </div>
     </>
+  );
+}
+
+function PendingInvitationsWidget() {
+  const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const fetchInvitations = async () => {
+    try {
+      const response = await api.get("/groups/invitations");
+      const allInvitations = response.data?.data || [];
+      setInvitations(allInvitations.filter((inv: PendingInvitation) => inv.status === "PENDING"));
+    } catch (error) {
+      console.error("Error fetching invitations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvitations();
+  }, []);
+
+  const handleAccept = async (invitationId: string) => {
+    setProcessingId(invitationId);
+    try {
+      await api.post(`/groups/invitations/${invitationId}/accept`);
+      setInvitations((prev) => prev.filter((inv) => inv._id !== invitationId));
+    } catch (error: any) {
+      console.error("Error accepting invitation:", error);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (invitationId: string) => {
+    setProcessingId(invitationId);
+    try {
+      await api.post(`/groups/invitations/${invitationId}/reject`);
+      setInvitations((prev) => prev.filter((inv) => inv._id !== invitationId));
+    } catch (error: any) {
+      console.error("Error rejecting invitation:", error);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-8 text-muted-foreground">جارٍ تحميل الدعوات...</div>;
+  }
+
+  if (invitations.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        لا توجد دعوات معلقة. <Link href="/student/invitations" className="text-primary hover:underline">عرض جميع الدعوات</Link>
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {invitations.slice(0, 3).map((invitation) => (
+        <div key={invitation._id} className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium">{invitation.groupId.title}</h4>
+            <span className="px-2 py-1 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 rounded-full text-xs font-medium">
+              قيد الانتظار
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {invitation.subject} • {invitation.grade}
+          </p>
+          <p className="text-sm">
+            من: <span className="font-medium">{invitation.teacherId.name}</span>
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleAccept(invitation._id)}
+              disabled={processingId === invitation._id}
+              className="flex-1 py-2 px-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+            >
+              {processingId === invitation._id ? "جاري المعالجة..." : "قبول"}
+            </button>
+            <button
+              onClick={() => handleReject(invitation._id)}
+              disabled={processingId === invitation._id}
+              className="flex-1 py-2 px-3 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+            >
+              {processingId === invitation._id ? "جاري المعالجة..." : "رفض"}
+            </button>
+          </div>
+        </div>
+      ))}
+      {invitations.length > 3 && (
+        <Link
+          href="/student/invitations"
+          className="text-center text-sm text-primary hover:underline block"
+        >
+          عرض {invitations.length - 3} دعوة أخرى
+        </Link>
+      )}
+    </div>
   );
 }
