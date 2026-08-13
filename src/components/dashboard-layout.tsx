@@ -291,10 +291,12 @@ export default function DashboardLayout({
           <div className="p-4 border-t">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
               {avatarUrl ? (
-                <img
+                <Image
                   src={avatarUrl}
                   alt={displayName}
-                  className="w-10 h-10 rounded-full object-cover"
+                  width={40}
+                  height={40}
+                  className="rounded-full object-cover"
                 />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -387,10 +389,12 @@ export default function DashboardLayout({
               <DynamicThemeToggle />
               <Link href={`/${activeRole}/profile`} className="flex items-center gap-2">
                 {avatarUrl ? (
-                  <img
+                  <Image
                     src={avatarUrl}
                     alt={displayName}
-                    className="w-8 h-8 rounded-full object-cover"
+                    width={32}
+                    height={32}
+                    className="rounded-full object-cover"
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
