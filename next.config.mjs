@@ -6,13 +6,20 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:5001/api/:path*",
+        destination: process.env.NEXT_PUBLIC_API_URL
+          ? `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`
+          : "/api/:path*",
       },
     ];
   },
 
   // Security headers
   async headers() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    const connectSrc = apiUrl
+      ? `'self' ws: ${apiUrl} https://*.supabase.co https://*.supabase.in`
+      : "'self' ws: http://localhost:5001 https://*.supabase.co https://*.supabase.in";
+
     return [
       {
         source: "/(.*)",
@@ -44,7 +51,7 @@ const nextConfig = {
           {
             key: "Content-Security-Policy",
             value:
-              "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: http://localhost:5001 https://*.supabase.co https://*.supabase.in; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
+              `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src ${connectSrc}; frame-ancestors 'none'; base-uri 'self'; form-action 'self';`,
           },
         ],
       },
