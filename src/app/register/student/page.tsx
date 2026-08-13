@@ -103,7 +103,7 @@ export default function StudentRegisterPage() {
 
       const { token, user } = response.data;
 
-      login(token, user);
+      login(user, token);
 
       toast.success("تم إنشاء الحساب بنجاح!", {
         description: "مرحباً بك في إديو سنتر.",

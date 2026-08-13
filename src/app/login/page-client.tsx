@@ -57,9 +57,9 @@ export default function LoginPage() {
         return;
       }
 
-      const { user } = response.data;
+      const { token, user } = response.data;
 
-      login(user);
+      login(user, token);
 
       const redirectTarget = roleRedirects[user.role];
       if (!redirectTarget) {

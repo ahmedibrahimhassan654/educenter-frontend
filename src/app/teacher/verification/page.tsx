@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
+import aiApi from "@/lib/ai-api";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
 import {
@@ -20,6 +21,8 @@ import {
   Trash2,
   File,
   Shield,
+  Wand2,
+  Info,
 } from "lucide-react";
 
 interface Curriculum {
@@ -46,6 +49,29 @@ const documentTypes = [
   { id: "otherCert", label: "شهادات أخرى (اختياري)", required: false },
 ];
 
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="معلومات"
+        onClick={() => setOpen((v) => !v)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <span className="absolute z-20 bottom-full mb-2 right-0 w-60 text-right text-xs text-foreground bg-popover border rounded-lg p-3 shadow-lg leading-relaxed">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function TeacherVerificationPage() {
   const { user, refreshUser, updateUser } = useAuth();
   const router = useRouter();
@@ -53,6 +79,7 @@ export default function TeacherVerificationPage() {
   const [curriculum, setCurriculum] = useState<Curriculum[]>([]);
   const [loadingCurriculum, setLoadingCurriculum] = useState(true);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [aiLoading, setAiLoading] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   
   const [formData, setFormData] = useState({
@@ -289,6 +316,36 @@ export default function TeacherVerificationPage() {
       toast.error(getErrorMessage(error, "حدث خطأ أثناء إرسال الطلب"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAiEnhance = async () => {
+    setAiLoading(true);
+    try {
+      const subjects = formData.selectedCurriculum.map(
+        (entry) => getDisplayName(entry).subject
+      );
+
+      const response = await aiApi.generateTeacherProfile({
+        experience: formData.experience,
+        bio: formData.bio,
+        subjects,
+        language: "ar",
+      });
+
+      const data = response.data;
+      if (data?.experience) {
+        setFormData((prev) => ({ ...prev, experience: data.experience }));
+      }
+      if (data?.bio) {
+        setFormData((prev) => ({ ...prev, bio: data.bio }));
+      }
+
+      toast.success("تم تحسين الخبرة والنبذة باستخدام الذكاء الاصطناعي");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إنشاء المحتوى بالذكاء الاصطناعي"));
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -535,6 +592,20 @@ export default function TeacherVerificationPage() {
                 <h2 className="text-lg font-bold">الخبرة التعليمية</h2>
                 <p className="text-sm text-muted-foreground">أخبرنا عن خبراتك في التدريس</p>
               </div>
+              <button
+                type="button"
+                onClick={handleAiEnhance}
+                disabled={aiLoading}
+                title="حسّن الخبرة والنبذة بالذكاء الاصطناعي"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 hover:bg-violet-500/20 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                {aiLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Wand2 className="w-4 h-4" />
+                )}
+                <span>سحر الذكاء الاصطناعي</span>
+              </button>
             </div>
             <textarea
               value={formData.experience}
@@ -552,7 +623,10 @@ export default function TeacherVerificationPage() {
                 <BookOpen className="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <h2 className="text-lg font-bold">المنهج الدراسي</h2>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  المنهج الدراسي
+                  <InfoTooltip text="اختر المناهج التي ستدرّسها، ثم اضغط على زر «سحر الذكاء الاصطناعي» بجانب الخبرة أو النبذة ليقوم الذكاء الاصطناعي بصياغتهما احترافياً بناءً على المواد التي اخترتها." />
+                </h2>
                 <p className="text-sm text-muted-foreground">اختر المناهج التي ستعمل بها</p>
               </div>
             </div>
@@ -725,6 +799,20 @@ export default function TeacherVerificationPage() {
                 <h2 className="text-lg font-bold">نبذة عنك</h2>
                 <p className="text-sm text-muted-foreground">أخبر الطلاب عن نفسك (اختياري)</p>
               </div>
+              <button
+                type="button"
+                onClick={handleAiEnhance}
+                disabled={aiLoading}
+                title="حسّن الخبرة والنبذة بالذكاء الاصطناعي"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 hover:bg-violet-500/20 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                {aiLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Wand2 className="w-4 h-4" />
+                )}
+                <span>سحر الذكاء الاصطناعي</span>
+              </button>
             </div>
             <textarea
               value={formData.bio}

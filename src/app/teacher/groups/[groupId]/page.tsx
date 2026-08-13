@@ -734,58 +734,22 @@ function AddStudentModal({
 
                   <div>
                     <label className="block text-sm font-medium mb-2">المرحلة الدراسية</label>
-                    <select
-                      value={formData.stage}
-                      onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
-                      className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      <option value="">اختر المرحلة</option>
-                      <option value="ابتدائي">ابتدائي</option>
-                      <option value="إعدادي">إعدادي</option>
-                      <option value="ثانوي">ثانوي</option>
-                    </select>
+                    <div className="w-full px-4 py-3 bg-muted/50 border border-dashed border-border rounded-lg text-base text-muted-foreground">
+                      {getStageLabel(groupStage) || "غير محدد"}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">تُحدد تلقائياً حسب المجموعة</p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium mb-2">الصف الدراسي</label>
-                    <select
-                      value={formData.grade}
-                      onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-                      className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      <option value="">اختر الصف</option>
-                      {formData.stage === "ابتدائي" && [
-                        "الأول الابتدائي",
-                        "الثاني الابتدائي",
-                        "الثالث الابتدائي",
-                        "الرابع الابتدائي",
-                        "الخامس الابتدائي",
-                        "السادس الابتدائي",
-                      ].map((g) => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                      {formData.stage === "إعدادي" && [
-                        "الأول الإعدادي",
-                        "الثاني الإعدادي",
-                        "الثالث الإعدادي",
-                      ].map((g) => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                      {formData.stage === "ثانوي" && [
-                        "الأول الثانوي",
-                        "الثاني الثانوي",
-                        "الثالث الثانوي",
-                      ].map((g) => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                      {!formData.stage && groupGrade && (
-                        <option value={groupGrade}>{groupGrade}</option>
-                      )}
-                    </select>
+                    <div className="w-full px-4 py-3 bg-muted/50 border border-dashed border-border rounded-lg text-base text-muted-foreground">
+                      {groupGrade || "غير محدد"}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">تُحدد تلقائياً حسب المجموعة</p>
                   </div>
 
                   <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
-                    <p>سيتم إنشاء حساب للطالب بكلمة مرور عشوائية وإرسال بيانات الدخول إلى بريده الإلكتروني.</p>
+                    <p>سيتم إنشاء حساب للطالب بكلمة مرور عشوائية وإرسال بيانات الدخول إلى بريده الإلكتروني، وستطابق المرحلة والصف تلقائياً مع المجموعة.</p>
                   </div>
 
                   <button

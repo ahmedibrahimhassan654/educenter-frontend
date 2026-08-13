@@ -52,6 +52,8 @@ interface User {
     bio?: string;
     documents?: string[];
   };
+  stage?: string;
+  grade?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -128,6 +130,8 @@ export default function AdminUsersPage() {
     phone: "",
     role: "STUDENT" as string,
     password: "",
+    stage: "",
+    grade: "",
   });
 
   // Cache for users data
@@ -231,6 +235,8 @@ export default function AdminUsersPage() {
       phone: "",
       role: "STUDENT",
       password: "",
+      stage: "",
+      grade: "",
     });
     setShowModal(true);
   };
@@ -263,11 +269,13 @@ export default function AdminUsersPage() {
       phone: user.phone,
       role: user.role,
       password: "",
+      stage: (user as any).stage || "",
+      grade: (user as any).grade || "",
     });
     setShowModal(true);
   };
 
-  // Save user
+   // Save user
   const handleSave = async () => {
     if (!formData.name || !formData.email || !formData.phone) {
       toast.error("جميع الحقول مطلوبة");
@@ -294,7 +302,7 @@ export default function AdminUsersPage() {
       clearCache("/users");
       await fetchUsers(true);
       await fetchStats();
-      setFormData({ name: "", email: "", phone: "", role: "STUDENT", password: "" });
+      setFormData({ name: "", email: "", phone: "", role: "STUDENT", password: "", stage: "", grade: "" });
       setShowModal(false);
     } catch (error: any) {
       const message = error.response?.data?.message || "خطأ في حفظ المستخدم";
@@ -706,6 +714,58 @@ export default function AdminUsersPage() {
                 </select>
               </div>
 
+              {formData.role === "STUDENT" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">المرحلة الدراسية</label>
+                    <select
+                      value={formData.stage}
+                      onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
+                      className="w-full h-10 px-3 rounded-lg border bg-background text-sm"
+                    >
+                      <option value="">اختر المرحلة</option>
+                      <option value="ابتدائي">ابتدائي</option>
+                      <option value="إعدادي">إعدادي</option>
+                      <option value="ثانوي">ثانوي</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">الصف الدراسي</label>
+                    <select
+                      value={formData.grade}
+                      onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                      className="w-full h-10 px-3 rounded-lg border bg-background text-sm"
+                    >
+                      <option value="">اختر الصف</option>
+                      {formData.stage === "ابتدائي" && [
+                        "الأول الابتدائي",
+                        "الثاني الابتدائي",
+                        "الثالث الابتدائي",
+                        "الرابع الابتدائي",
+                        "الخامس الابتدائي",
+                        "السادس الابتدائي",
+                      ].map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                      {formData.stage === "إعدادي" && [
+                        "الأول الإعدادي",
+                        "الثاني الإعدادي",
+                        "الثالث الإعدادي",
+                      ].map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                      {formData.stage === "ثانوي" && [
+                        "الأول الثانوي",
+                        "الثاني الثانوي",
+                        "الثالث الثانوي",
+                      ].map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               {modalMode === "add" && (
                 <div>
                   <label className="block text-sm font-medium mb-1">كلمة المرور</label>
@@ -820,6 +880,25 @@ export default function AdminUsersPage() {
                   <p className="font-medium text-sm">{formatDate(showViewModal.updatedAt)}</p>
                 </div>
               </div>
+
+              {/* Student-specific info */}
+              {showViewModal.role === "STUDENT" && (
+                <div className="p-2.5 bg-green-500/5 border border-green-500/20 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                    <BookOpen className="w-3 h-3 text-green-500" /> المعلومات الدراسية
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 bg-background rounded-lg border">
+                      <p className="text-[11px] text-muted-foreground">المرحلة</p>
+                      <p className="text-sm font-medium">{showViewModal.stage || "—"}</p>
+                    </div>
+                    <div className="p-2 bg-background rounded-lg border">
+                      <p className="text-[11px] text-muted-foreground">الصف</p>
+                      <p className="text-sm font-medium">{showViewModal.grade || "—"}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Teacher-specific info */}
               {showViewModal.role === "TEACHER" && (

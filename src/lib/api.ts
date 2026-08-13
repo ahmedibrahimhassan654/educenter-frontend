@@ -1,7 +1,7 @@
 import axios from "axios";
 import { User } from "@/types";
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const api = axios.create({
   baseURL,
@@ -73,8 +73,13 @@ function getCacheDuration(url: string): number {
     : CACHE_DURATION;
 }
 
-// Cache interceptor (no auth header needed - cookies sent automatically)
-api.interceptors.request.use(async (config) => {
+// Add Authorization header from localStorage token
+api.interceptors.request.use((config) => {
+  const token = getStoredToken();
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
   const cacheKey = getCacheKey(config);
   if (cacheKey) {
     const cached = responseCache.get(cacheKey);

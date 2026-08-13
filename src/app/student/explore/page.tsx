@@ -3,18 +3,20 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
+import { toast } from "sonner";
 import {
   Search,
   Filter,
   Star,
   Clock,
   Calendar,
-  ArrowLeft,
   BookOpen,
   GraduationCap,
   Loader2,
   Users,
   Sparkles,
+  Check,
+  X,
 } from "lucide-react";
 
 interface Group {
@@ -45,6 +47,7 @@ export default function StudentExplorePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStage, setSelectedStage] = useState("الكل");
   const [selectedSubject, setSelectedSubject] = useState("الكل");
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -115,6 +118,24 @@ export default function StudentExplorePage() {
       Saturday: "السبت",
     };
     return days.map((d) => dayNames[d] || d).join(" و ");
+  };
+
+  const handleAccept = async (groupId: string) => {
+    setProcessingId(groupId);
+    try {
+      await api.post(`/groups/${groupId}/students`, { studentId: user?.id });
+      toast.success("تم إرسال طلب الانضمام بنجاح");
+      setGroups((prev) => prev.filter((g) => g._id !== groupId));
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "فشل في إرسال طلب الانضمام");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRefuse = (groupId: string) => {
+    setGroups((prev) => prev.filter((g) => g._id !== groupId));
+    toast.success("تم تجاهل المجموعة");
   };
 
   if (loading) {
@@ -264,10 +285,28 @@ export default function StudentExplorePage() {
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 pt-0">
-                  <button className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg text-base font-medium hover:bg-primary/90 transition-colors">
-                    انضم للمجموعة
-                    <ArrowLeft className="w-5 h-5" />
+                <div className="p-6 pt-0 flex gap-3">
+                  <button
+                    onClick={() => handleAccept(group._id)}
+                    disabled={processingId === group._id}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+                  >
+                    {processingId === group._id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        قبول
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleRefuse(group._id)}
+                    disabled={processingId === group._id}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+                  >
+                    <X className="w-4 h-4" />
+                    رفض
                   </button>
                 </div>
               </div>

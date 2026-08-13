@@ -272,6 +272,21 @@ const aiApi = {
     const { data } = await api.delete(`/ai/generated/${id}`);
     return data;
   },
+
+  generateTeacherProfile: async (params: {
+    experience?: string;
+    bio?: string;
+    subjects?: string[];
+    language?: string;
+  }): Promise<
+    ApiResponse<{
+      experience: string;
+      bio: string;
+    }>
+  > => {
+    const { data } = await api.post("/ai/teacher-profile", params);
+    return data;
+  },
 };
 
 export default aiApi;
@@ -285,7 +300,7 @@ export async function streamChat(
   const { getStoredToken } = await import("./api");
   const token = getStoredToken();
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

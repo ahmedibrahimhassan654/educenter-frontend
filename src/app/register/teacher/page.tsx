@@ -105,7 +105,7 @@ export default function TeacherRegisterPage() {
 
       const { token, user } = response.data;
 
-      login(token, user);
+      login(user, token);
 
       toast.success("تم إنشاء الحساب بنجاح!", {
         description: "مرحباً بك في إديو سنتر. يرجى إكمال خطوات التحقق.",
