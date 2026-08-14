@@ -89,6 +89,47 @@ export interface AuthResponse {
   token: string;
 }
 
+export interface PublicTeacher {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  verificationStatus?: string;
+  verifiedAt?: string;
+  createdAt?: string;
+  bio?: string;
+  experience?: string;
+  curriculum?: string[];
+}
+
+export interface PublicGroup {
+  id: string;
+  title: string;
+  subject: string;
+  grade: string;
+  stage?: string;
+  totalSessionPrice: number;
+  maxStudentsPerGroup: number;
+  scheduleDays: string[];
+  studentsCount: number;
+  createdAt?: string;
+  teacher?: PublicTeacher | null;
+}
+
+export interface PublicGroupDetail extends PublicGroup {
+  updatedAt?: string;
+}
+
+export interface PublicTeacherProfile extends PublicTeacher {
+  groups: PublicGroup[];
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
 export interface ApiError {
   message: string;
   status: number;

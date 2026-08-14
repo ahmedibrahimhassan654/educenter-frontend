@@ -1,0 +1,36 @@
+ ⨯ TypeError: Cannot read properties of undefined (reading 'call')
+    at Object.__webpack_require__ [as require] (D:\projects\educenter full stack\educenter-frontend\.next\server\webpack-runtime.js:33:43)
+    at JSON.parse (<anonymous>)
+digest: "4238735377"
+TypeError: Cannot read properties of undefined (reading 'call')
+    at Object.__webpack_require__ [as require] (D:\projects\educenter full stack\educenter-frontend\.next\server\webpack-runtime.js:33:43)
+    at require (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:40:20064)
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108376
+    at ea (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108583)
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:110813
+    at Object._fromJSON (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:111370)
+    at JSON.parse (<anonymous>)
+    at ec (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:109078)
+    at eo (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108123)
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115291
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115308
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115341
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115358
+    at t (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115581)
+ ⨯ TypeError: Cannot read properties of undefined (reading 'call')
+    at Object.__webpack_require__ [as require] (D:\projects\educenter full stack\educenter-frontend\.next\server\webpack-runtime.js:33:43)
+    at require (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:40:20064)
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108376
+    at ea (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108583)
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:110813
+    at Object._fromJSON (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:111370)
+    at JSON.parse (<anonymous>)
+    at ec (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:109078)
+    at eo (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:108123)
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115291
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115308
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115341
+    at D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115358
+    at t (D:\projects\educenter full stack\educenter-frontend\node_modules\next\dist\compiled\next-server\app-page.runtime.dev.js:35:115581) {
+  page: '/teachers/6a77e5ad7fdcb194b531992f'
+}

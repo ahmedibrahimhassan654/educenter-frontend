@@ -1,8 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Metadata } from "next";
-import { DynamicThemeToggle } from "@/lib/dynamic-imports";
-import PublicNavActions from "@/components/public-nav-actions";
+import PublicHeader from "@/components/public-header";
+import PublicFooter from "@/components/public-footer";
 import {
   Eye,
   Shield,
@@ -170,32 +169,7 @@ export default function ForParentsPage() {
   return (
     <div className="min-h-screen" dir="rtl">
       {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur-md sticky top-0 z-50">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="شعار المنصة" width={40} height={40} priority />
-            <span className="text-xl font-bold text-primary">إديو سنتر</span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/" className="text-base font-medium hover:text-primary transition-colors">
-              الرئيسية
-            </Link>
-            <Link href="/for-teachers" className="text-base font-medium hover:text-primary transition-colors">
-              للمعلمين
-            </Link>
-            <Link href="/for-parents" className="text-base font-medium text-primary">
-              لأولياء الأمور
-            </Link>
-            <Link href="/for-students" className="text-base font-medium hover:text-primary transition-colors">
-              للطلاب
-            </Link>
-          </nav>
-          <div className="flex items-center gap-4">
-            <DynamicThemeToggle />
-            <PublicNavActions ctaHref="/register" ctaLabel="ابدأ الآن" />
-          </div>
-        </div>
-      </header>
+      <PublicHeader active="parents" />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden py-24 md:py-36">
@@ -475,12 +449,7 @@ export default function ForParentsPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t bg-muted/30 py-12">
-        <div className="container text-center text-base text-muted-foreground">
-          <p>© {new Date().getFullYear()} إديو سنتر. جميع الحقوق محفوظة.</p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

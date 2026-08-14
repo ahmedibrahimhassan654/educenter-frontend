@@ -1,0 +1,28 @@
+[32m✔[0m [33mConsole Ninja[0m extension is connected to [33mNext.js[0m, see [36mhttps://tinyurl.com/2vt8jxzw[0m
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 6.9s
+ ○ Compiling /teachers/[teacherId] ...
+ ✓ Compiled /teachers/[teacherId] in 13.2s (1647 modules)
+ ✓ Compiled in 413ms (685 modules)
+ GET /teachers/6a77e5ad7fdcb194b531992f 200 in 14603ms
+ ○ Compiling /groups ...
+ ✓ Compiled /groups in 4.8s (1629 modules)
+ GET /groups 200 in 5157ms
+ ○ Compiling /groups/[groupId] ...
+ ✓ Compiled /groups/[groupId] in 670ms (1645 modules)
+ GET /groups/6a77f317ebe4bdcf4dd55e72 200 in 1477ms
+ GET /teachers/6a77e5ad7fdcb194b531992f 200 in 92ms
+ ✓ Compiled in 991ms (697 modules)
+ ○ Compiling /teachers/[teacherId] ...
+ ✓ Compiled /teachers/[teacherId] in 1199ms (944 modules)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 4.5s (1851 modules)
+ GET /teachers/6a77e5ad7fdcb194b531992f 500 in 9033ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 1298ms (1016 modules)
+ GET /favicon.ico 200 in 1918ms
+[?25h

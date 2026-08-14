@@ -1,8 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Metadata } from "next";
-import { DynamicThemeToggle } from "@/lib/dynamic-imports";
-import UserMenu from "@/components/user-menu";
+import PublicHeader from "@/components/public-header";
+import PublicFooter from "@/components/public-footer";
 import { JsonLd } from "@/components/json-ld";
 import { generateLocalBusinessSchema, generateFAQSchema } from "@/lib/seo";
 import {
@@ -180,30 +179,7 @@ export default function Home() {
       <JsonLd data={generateLocalBusinessSchema()} />
       <JsonLd data={faqSchema} />
       
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur-md sticky top-0 z-50">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="شعار المنصة" width={40} height={40} priority />
-            <span className="text-xl font-bold text-primary">إديو سنتر</span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/for-teachers" className="text-base font-medium hover:text-primary transition-colors">
-              للمعلمين
-            </Link>
-            <Link href="/for-parents" className="text-base font-medium hover:text-primary transition-colors">
-              لأولياء الأمور
-            </Link>
-            <Link href="/for-students" className="text-base font-medium hover:text-primary transition-colors">
-              للطلاب
-            </Link>
-          </nav>
-          <div className="flex items-center gap-4">
-            <DynamicThemeToggle />
-            <UserMenu />
-          </div>
-        </div>
-      </header>
+      <PublicHeader active="home" />
 
       <main className="flex-1">
         {/* Hero Section */}
@@ -625,48 +601,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t bg-muted/30 py-16">
-        <div className="container">
-          <div className="grid md:grid-cols-4 gap-10">
-            <div>
-              <div className="flex items-center gap-3 mb-5">
-                <Image src="/logo.png" alt="إديو سنتر" width={36} height={36} />
-                <span className="text-xl font-bold">إديو سنتر</span>
-              </div>
-              <p className="text-base text-muted-foreground">
-                منصة متكاملة لإدارة التعليم الخصوصي
-              </p>
-            </div>
-            <div>
-              <h4 className="text-lg font-semibold mb-5">المنصة</h4>
-              <ul className="space-y-3 text-base text-muted-foreground">
-                <li><Link href="/features" className="hover:text-foreground transition-colors">المميزات</Link></li>
-                <li><Link href="/pricing" className="hover:text-foreground transition-colors">الأسعار</Link></li>
-                <li><Link href="/about" className="hover:text-foreground transition-colors">عن المنصة</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-lg font-semibold mb-5">الدعم</h4>
-              <ul className="space-y-3 text-base text-muted-foreground">
-                <li><Link href="/help" className="hover:text-foreground transition-colors">مركز المساعدة</Link></li>
-                <li><Link href="/contact" className="hover:text-foreground transition-colors">اتصل بنا</Link></li>
-                <li><Link href="/faq" className="hover:text-foreground transition-colors">الأسئلة الشائعة</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-lg font-semibold mb-5">قانوني</h4>
-              <ul className="space-y-3 text-base text-muted-foreground">
-                <li><Link href="/privacy" className="hover:text-foreground transition-colors">سياسة الخصوصية</Link></li>
-                <li><Link href="/terms" className="hover:text-foreground transition-colors">الشروط والأحكام</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t mt-10 pt-10 text-center text-base text-muted-foreground">
-            © {new Date().getFullYear()} إديو سنتر. جميع الحقوق محفوظة.
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }
