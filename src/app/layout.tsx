@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/next";
 import { JsonLd } from "@/components/json-ld";
 import { generateOrganizationSchema, generateWebsiteSchema, SITE_CONFIG } from "@/lib/seo";
 
@@ -123,6 +124,7 @@ export default function RootLayout({
             />
           </AuthProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );

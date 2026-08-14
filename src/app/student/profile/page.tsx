@@ -100,9 +100,7 @@ export default function StudentProfilePage() {
       const formData = new FormData();
       formData.append("avatar", file);
 
-      const response = await api.post("/users/upload-avatar", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await api.post("/users/upload-avatar", formData);
 
       const newAvatarUrl = response.data?.avatarUrl;
       if (newAvatarUrl) {

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { User } from "@/types";
-import api, { getStoredUser, clearAuth, TOKEN_KEY } from "@/lib/api";
+import api, { getStoredUser, getStoredToken, clearAuth, setAuth } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const storedUser = getStoredUser();
-      if (!storedUser) {
+      if (!storedUser && !getStoredToken()) {
         setUser(null);
         cachedUser = null;
         userCacheExpiry = 0;
@@ -72,9 +72,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(userData);
       } catch (apiError: any) {
         console.error("API /auth/me error:", apiError?.response?.data || apiError?.message || apiError);
-        setUser(null);
-        cachedUser = null;
-        clearAuth();
+        const status = apiError?.response?.status;
+        if (status === 401) {
+          // Definitive auth failure (invalid/expired token): clear the session.
+          setUser(null);
+          cachedUser = null;
+          userCacheExpiry = 0;
+          clearAuth();
+        } else {
+          // Transient error (network, timeout, 5xx): keep the current session.
+          // Only fall back to the stored user when no user is loaded yet, so
+          // guards never bounce an authenticated user to /login.
+          if (!cachedUser) {
+            const fallback = getStoredUser();
+            if (fallback) {
+              cachedUser = fallback;
+              userCacheExpiry = Date.now() + USER_CACHE_DURATION;
+              setUser(fallback);
+            }
+          }
+        }
       } finally {
         setIsLoading(false);
       }
@@ -100,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback((userData: User, token?: string) => {
     if (token && typeof window !== "undefined") {
-      localStorage.setItem(TOKEN_KEY, token);
+      setAuth(token, userData);
     }
     cachedUser = userData;
     userCacheExpiry = Date.now() + USER_CACHE_DURATION;
