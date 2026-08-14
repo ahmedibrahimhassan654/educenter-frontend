@@ -24,6 +24,7 @@ import {
   Sparkles,
   Settings,
   UserPlus,
+  Compass,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -55,6 +56,7 @@ const unverifiedTeacherLinks: SidebarLink[] = [
 const studentLinks: SidebarLink[] = [
   { href: "/student", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
   { href: "/student/ai-study", label: "المعلم الذكي", icon: Sparkles, color: "learning" },
+  { href: "/student/explore", label: "استكشف المجموعات", icon: Compass, color: "learning" },
   { href: "/student/my-groups", label: "مجموعاتي", icon: Users, color: "people" },
   { href: "/student/invitations", label: "المجموعات المضافة", icon: UserPlus, color: "alert" },
   { href: "/student/my-progress", label: "تقدمي", icon: BarChart3, color: "progress" },
