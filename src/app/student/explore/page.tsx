@@ -37,8 +37,16 @@ interface Group {
   totalSessionPrice?: number;
 }
 
-const stages = ["الكل", "الابتدائي", "الإعدادي", "الثانوي"];
+const stages = ["الكل", "المرحلة الابتدائية", "المرحلة الإعدادية", "المرحلة الثانوية"];
 const subjects = ["الكل", "رياضيات", "فيزياء", "كيمياء", "علوم", "لغة عربية", "لغة إنجليزية"];
+
+const STAGE_SHORT_NAMES: Record<string, string> = {
+  "المرحلة الابتدائية": "ابتدائي",
+  "المرحلة الإعدادية": "إعدادي",
+  "المرحلة الثانوية": "ثانوي",
+};
+
+const stageShortName = (stage: string): string => STAGE_SHORT_NAMES[stage] || stage;
 
 export default function StudentExplorePage() {
   const { user } = useAuth();
@@ -68,9 +76,9 @@ export default function StudentExplorePage() {
   const studentGrade = user?.grade || "";
 
   const getStageFromGrade = (grade: string): string => {
-    if (grade.includes("ابتدائي")) return "ابتدائي";
-    if (grade.includes("إعدادي")) return "إعدادي";
-    if (grade.includes("الثانوي")) return "الثانوي";
+    if (grade.includes("ابتدائي")) return "المرحلة الابتدائية";
+    if (grade.includes("إعدادي")) return "المرحلة الإعدادية";
+    if (grade.includes("الثانوي")) return "المرحلة الثانوية";
     return "";
   };
 
@@ -156,13 +164,13 @@ export default function StudentExplorePage() {
           <h2 className="text-2xl md:text-3xl font-bold">استكشف المجموعات</h2>
           <p className="text-base text-muted-foreground mt-1">
             {studentStage && studentGrade
-              ? `المجموعات المناسبة لك (${studentStage} - ${studentGrade})`
+              ? `المجموعات المناسبة لك (${stageShortName(studentStage)} - ${studentGrade})`
               : "ابحث عن المجموعات المناسبة وانضم إليها"}
           </p>
           {studentStage && studentGrade && (
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium">
               <Sparkles className="w-4 h-4" />
-              {studentStage} - {studentGrade}
+              {stageShortName(studentStage)} - {studentGrade}
             </div>
           )}
         </div>

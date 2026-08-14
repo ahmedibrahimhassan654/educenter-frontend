@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { useAuth } from "@/components/auth-provider";
 
 const benefits = [
   { icon: Calendar, text: "إدارة ذكية للجداول والحصص" },
@@ -40,7 +39,6 @@ const steps = [
 
 export default function TeacherRegisterPage() {
   const router = useRouter();
-  const { login } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -97,25 +95,21 @@ export default function TeacherRegisterPage() {
         role: "TEACHER",
       });
 
-      if (!response.data?.token || !response.data?.user) {
+      if (!response.data?.user) {
         toast.error("حدث خطأ أثناء التسجيل");
         setLoading(false);
         return;
       }
 
-      const { token, user } = response.data;
-
-      login(user, token);
-
       toast.success("تم إنشاء الحساب بنجاح!", {
-        description: "مرحباً بك في إديو سنتر. يرجى إكمال خطوات التحقق.",
+        description: "سجّل دخولك الآن لإكمال خطوات التحقق.",
         duration: 3000,
       });
 
       setTimeout(() => {
-        router.push("/teacher/verification");
+        router.push("/login?registered=1");
         router.refresh();
-      }, 1500);
+      }, 1200);
     } catch (error: any) {
       console.error("Registration error:", error?.response?.data || error?.message || error);
       const message = error?.response?.data?.message || "حدث خطأ غير متوقع. حاول مرة أخرى.";

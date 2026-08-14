@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { useAuth } from "@/components/auth-provider";
 
 const benefits = [
   { icon: BookOpen, text: "مجموعات صغيرة حتى ٢٠ طالب" },
@@ -38,7 +37,6 @@ const steps = [
 
 export default function StudentRegisterPage() {
   const router = useRouter();
-  const { login } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -95,29 +93,21 @@ export default function StudentRegisterPage() {
         role: "STUDENT",
       });
 
-      if (!response.data?.token || !response.data?.user) {
+      if (!response.data?.user) {
         toast.error("حدث خطأ أثناء التسجيل");
         setLoading(false);
         return;
       }
 
-      const { token, user } = response.data;
-
-      login(user, token);
-
       toast.success("تم إنشاء الحساب بنجاح!", {
-        description: "مرحباً بك في إديو سنتر.",
+        description: "سجّل دخولك الآن لمتابعة رحلتك التعليمية.",
         duration: 3000,
       });
 
-      const redirectTarget = user.role === "TEACHER" && user.verificationStatus !== "VERIFIED"
-        ? "/teacher/verification"
-        : "/student/onboarding";
-
       setTimeout(() => {
-        router.push(redirectTarget);
+        router.push("/login?registered=1");
         router.refresh();
-      }, 1500);
+      }, 1200);
     } catch (error: any) {
       console.error("Registration error:", error?.response?.data || error?.message || error);
       const message = error?.response?.data?.message || "حدث خطأ غير متوقع. حاول مرة أخرى.";

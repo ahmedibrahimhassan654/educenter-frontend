@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
@@ -12,33 +12,48 @@ import {
   Loader2,
   ArrowLeft,
   CheckCircle2,
+  ChevronLeft,
 } from "lucide-react";
 
-const stages = [
-  { key: "ابتدائي", label: "الابتدائي" },
-  { key: "إعدادي", label: "الإعدادي" },
-  { key: "ثانوي", label: "الثانوي" },
+interface CurriculumGrade {
+  name: string;
+  subjects?: unknown[];
+}
+interface CurriculumStage {
+  name: string;
+  grades?: CurriculumGrade[];
+}
+
+const fallbackStages: CurriculumStage[] = [
+  {
+    name: "المرحلة الابتدائية",
+    grades: [
+      "الأول",
+      "الثاني",
+      "الثالث",
+      "الرابع",
+      "الخامس",
+      "السادس",
+    ].map((g) => ({ name: `الصف ${g} الابتدائي` })),
+  },
+  {
+    name: "المرحلة الإعدادية",
+    grades: ["الأول", "الثاني", "الثالث"].map((g) => ({
+      name: `الصف ${g} الإعدادي`,
+    })),
+  },
+  {
+    name: "المرحلة الثانوية",
+    grades: ["الأول", "الثاني", "الثالث"].map((g) => ({
+      name: `الصف ${g} الثانوي`,
+    })),
+  },
 ];
 
-const gradesByStage: Record<string, string[]> = {
-  ابتدائي: [
-    "الأول الابتدائي",
-    "الثاني الابتدائي",
-    "الثالث الابتدائي",
-    "الرابع الابتدائي",
-    "الخامس الابتدائي",
-    "السادس الابتدائي",
-  ],
-  إعدادي: [
-    "الأول الإعدادي",
-    "الثاني الإعدادي",
-    "الثالث الإعدادي",
-  ],
-  ثانوي: [
-    "الأول الثانوي",
-    "الثاني الثانوي",
-    "الثالث الثانوي",
-  ],
+const STAGE_SHORT_NAMES: Record<string, string> = {
+  "المرحلة الابتدائية": "ابتدائي",
+  "المرحلة الإعدادية": "إعدادي",
+  "المرحلة الثانوية": "ثانوي",
 };
 
 export default function StudentOnboardingPage() {
@@ -47,7 +62,7 @@ export default function StudentOnboardingPage() {
   const [selectedStage, setSelectedStage] = useState("");
   const [selectedGrade, setSelectedGrade] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [curriculumTree, setCurriculumTree] = useState<any[]>([]);
+  const [curriculumStages, setCurriculumStages] = useState<CurriculumStage[]>([]);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "STUDENT")) {
@@ -59,15 +74,25 @@ export default function StudentOnboardingPage() {
     const fetchCurriculum = async () => {
       try {
         const res = await api.get("/curriculum");
-        setCurriculumTree(res.data || []);
+        const data = Array.isArray(res.data) ? res.data : [];
+        if (data.length > 0) setCurriculumStages(data);
       } catch {
-        // ignore
+        // fall back to hardcoded list
       }
     };
     fetchCurriculum();
   }, []);
 
-  const availableGrades = selectedStage ? (gradesByStage[selectedStage] || []) : [];
+  const stages = useMemo(() => {
+    if (curriculumStages.length > 0) return curriculumStages;
+    return fallbackStages;
+  }, [curriculumStages]);
+
+  const availableGrades = useMemo(() => {
+    if (!selectedStage) return [];
+    const stage = stages.find((s) => s.name === selectedStage);
+    return (stage?.grades || []).map((g) => g.name);
+  }, [stages, selectedStage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,22 +144,35 @@ export default function StudentOnboardingPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-base font-medium mb-3">المرحلة الدراسية</label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 {stages.map((stage) => (
                   <button
-                    key={stage.key}
+                    key={stage.name}
                     type="button"
                     onClick={() => {
-                      setSelectedStage(stage.key);
+                      setSelectedStage(stage.name);
                       setSelectedGrade("");
                     }}
-                    className={`px-4 py-3 border rounded-lg text-sm font-medium transition-all ${
-                      selectedStage === stage.key
+                    className={`flex items-center justify-between px-5 py-3.5 border rounded-xl text-base font-medium transition-all ${
+                      selectedStage === stage.name
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "hover:bg-primary/5 hover:border-primary/30"
                     }`}
                   >
-                    {stage.label}
+                    <span className="flex items-center gap-3">
+                      <BookOpen className="w-5 h-5" />
+                      {stage.name}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 text-sm ${
+                        selectedStage === stage.name
+                          ? "text-primary-foreground/80"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {STAGE_SHORT_NAMES[stage.name] || stage.name}
+                      <ChevronLeft className="w-4 h-4" />
+                    </span>
                   </button>
                 ))}
               </div>

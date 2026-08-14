@@ -302,6 +302,15 @@ export default function StudentProfilePage() {
                       عضو منذ {user?.createdAt ? new Date(user.createdAt).toLocaleDateString("ar-EG") : "يناير ٢٠٢٤"}
                     </span>
                   </div>
+                  {(user as any)?.stage || (user as any)?.grade ? (
+                    <div className="flex items-center gap-3 text-sm">
+                      <GraduationCap className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        {(user as any)?.stage || ""}{" - "}
+                        {(user as any)?.grade || ""}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-6 pt-6 border-t">
@@ -318,6 +327,41 @@ export default function StudentProfilePage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Academic History */}
+            <div className="bg-card border rounded-xl overflow-hidden">
+              <div className="p-5 border-b flex items-center gap-2">
+                <Award className="w-4 h-4 text-cyan-600" />
+                <h4 className="font-semibold">السجل الأكاديمي</h4>
+              </div>
+              {Array.isArray((user as any)?.academicHistory) && (user as any).academicHistory.length > 0 ? (
+                <div className="divide-y">
+                  {(user as any).academicHistory.map((entry: any, index: number) => (
+                    <div key={index} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">{entry.grade || "غير محدد"}</p>
+                        {entry.year && (
+                          <Badge variant="outline" className="text-xs">{entry.year}</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{entry.stage || ""}</p>
+                      {entry.startDate && entry.endDate && (
+                        <p className="text-xs text-muted-foreground mt-1" dir="ltr">
+                          {new Date(entry.startDate).toLocaleDateString("ar-EG")} →{" "}
+                          {new Date(entry.endDate).toLocaleDateString("ar-EG")}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    لا يوجد سجل أكاديمي بعد. سيتم تسجيل تاريخك الدراسي عند الترقية إلى مرحلة أعلى.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Quick Actions */}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Mail,
   Lock,
@@ -36,6 +36,8 @@ const roleRedirects: Record<string, string> = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const registered = searchParams.get("registered") === "1";
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -71,6 +73,8 @@ export default function LoginPage() {
       let redirectPath = redirectTarget;
       if (user.role === "TEACHER" && user.verificationStatus !== "VERIFIED") {
         redirectPath = "/teacher/verification";
+      } else if (user.role === "STUDENT" && !user.stage) {
+        redirectPath = "/student/onboarding";
       }
 
       toast.success("تم تسجيل الدخول بنجاح", {
@@ -128,6 +132,13 @@ export default function LoginPage() {
               سجّل دخولك لمتابعة رحلتك التعليمية
             </p>
           </div>
+
+          {/* Success Banner */}
+          {registered && (
+            <div className="mb-6 p-4 bg-green-500/10 border border-green-500/25 rounded-xl text-green-600 dark:text-green-400 text-base animate-shake">
+              تم إنشاء حسابك بنجاح! سجّل دخولك الآن لمتابعة رحلتك التعليمية.
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (

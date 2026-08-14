@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { useAuth } from "@/components/auth-provider";
 
 const benefits = [
   { icon: Heart, text: "متابعة مستمرة لأداء طفلك" },
@@ -38,7 +37,6 @@ const steps = [
 
 export default function ParentRegisterPage() {
   const router = useRouter();
-  const { login } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -95,25 +93,21 @@ export default function ParentRegisterPage() {
         role: "PARENT",
       });
 
-      if (!response.data?.token || !response.data?.user) {
+      if (!response.data?.user) {
         toast.error("حدث خطأ أثناء التسجيل");
         setLoading(false);
         return;
       }
 
-      const { token, user } = response.data;
-
-      login(user, token);
-
       toast.success("تم إنشاء الحساب بنجاح!", {
-        description: "مرحباً بك في إديو سنتر.",
+        description: "سجّل دخولك الآن لمتابعة طفلك.",
         duration: 3000,
       });
 
       setTimeout(() => {
-        router.push("/parent");
+        router.push("/login?registered=1");
         router.refresh();
-      }, 1500);
+      }, 1200);
     } catch (error: any) {
       console.error("Registration error:", error?.response?.data || error?.message || error);
       const message = error?.response?.data?.message || "حدث خطأ غير متوقع. حاول مرة أخرى.";
