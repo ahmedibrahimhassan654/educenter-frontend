@@ -2,8 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  output: 'export',
-
   distDir: '.next',
 
   // Optimize images (unoptimized required for static export)
