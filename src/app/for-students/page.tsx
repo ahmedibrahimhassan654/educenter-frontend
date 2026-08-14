@@ -190,7 +190,7 @@ export default function ForStudentsPage() {
 
             <div className="flex flex-col sm:flex-row gap-5 justify-center mb-20">
               <Link
-                href="/register"
+                href="/register/student"
                 className="inline-flex items-center justify-center gap-3 px-10 py-5 bg-primary text-primary-foreground rounded-xl text-xl font-medium hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/25"
               >
                 سجّل كطالب
@@ -461,7 +461,7 @@ export default function ForStudentsPage() {
                 انضم إلى آلاف الطلاب الذين يتعلمون ويحققون نتائج ممتازة مع منصتنا
               </p>
               <Link
-                href="/register"
+                href="/register/student"
                 className="inline-flex items-center justify-center gap-3 px-10 py-5 bg-white text-cyan-600 rounded-xl text-xl font-medium hover:bg-white/90 transition-colors"
               >
                 سجّل مجاناً

@@ -197,7 +197,7 @@ export default function ForParentsPage() {
 
             <div className="flex flex-col sm:flex-row gap-5 justify-center mb-20">
               <Link
-                href="/register"
+                href="/register/parent"
                 className="inline-flex items-center justify-center gap-3 px-10 py-5 bg-primary text-primary-foreground rounded-xl text-xl font-medium hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/25"
               >
                 سجّل كولي أمر
@@ -438,7 +438,7 @@ export default function ForParentsPage() {
                 انضم إلى آلاف أولياء الأمور الذين يثقون بمنصنا لمتابعة أبنائهم
               </p>
               <Link
-                href="/register"
+                href="/register/parent"
                 className="inline-flex items-center justify-center gap-3 px-10 py-5 bg-white text-rose-600 rounded-xl text-xl font-medium hover:bg-white/90 transition-colors"
               >
                 سجّل مجاناً
