@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
-import { Group, User } from "@/types";
+import { Group } from "@/types";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -20,7 +20,21 @@ import {
   X,
   Mail,
   Phone,
+  GraduationCap,
+  Send,
+  CheckCircle2,
 } from "lucide-react";
+
+interface SuggestedStudent {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  stage?: string;
+  grade?: string;
+  hasPendingInvitation?: boolean;
+}
 
 export default function GroupDetailPage() {
   const params = useParams();
@@ -468,10 +482,12 @@ function AddStudentModal({
   currentStudents: number;
 }) {
   const [showModal, setShowModal] = useState(false);
-  const [mode, setMode] = useState<"existing" | "new">("new");
+  const [mode, setMode] = useState<"new" | "existing" | "stage">("new");
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searchResults, setSearchResults] = useState<SuggestedStudent[]>([]);
   const [searching, setSearching] = useState(false);
+  const [stageStudents, setStageStudents] = useState<SuggestedStudent[]>([]);
+  const [loadingStage, setLoadingStage] = useState(false);
   const [adding, setAdding] = useState(false);
   const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState({
@@ -489,14 +505,16 @@ function AddStudentModal({
     }
     setSearching(true);
     try {
-      const response = await api.get(`/users?search=${encodeURIComponent(searchQuery)}&role=STUDENT&limit=10`);
+      const response = await api.get(`/groups/${groupId}/suggested-students`, {
+        params: { search: searchQuery },
+      });
       setSearchResults(response.data.data || []);
     } catch {
       setSearchResults([]);
     } finally {
       setSearching(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, groupId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -505,18 +523,39 @@ function AddStudentModal({
     return () => clearTimeout(timer);
   }, [searchStudents]);
 
+  const fetchStageStudents = useCallback(async () => {
+    setLoadingStage(true);
+    try {
+      const response = await api.get(`/groups/${groupId}/suggested-students`);
+      setStageStudents(response.data.data || []);
+    } catch {
+      setStageStudents([]);
+    } finally {
+      setLoadingStage(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    if (showModal && mode === "stage") {
+      fetchStageStudents();
+    }
+  }, [showModal, mode, fetchStageStudents]);
+
   const handleAddExisting = async (studentId: string) => {
     setAdding(true);
     try {
       await api.post(`/groups/${groupId}/students`, { studentId });
-      toast.success("تمت إضافة الطالب بنجاح");
-      setShowModal(false);
-      setSearchQuery("");
-      setSearchResults([]);
+      toast.success("تم إرسال الدعوة بنجاح");
+      const markPending = (list: SuggestedStudent[]) =>
+        list.map((s) =>
+          s.id === studentId ? { ...s, hasPendingInvitation: true } : s
+        );
+      setSearchResults(markPending);
+      setStageStudents(markPending);
       onStudentAdded();
     } catch (error) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      const message = axiosError.response?.data?.message || "فشل في إضافة الطالب";
+      const message = axiosError.response?.data?.message || "فشل في إرسال الدعوة";
       toast.error(message);
     } finally {
       setAdding(false);
@@ -621,6 +660,16 @@ function AddStudentModal({
                 >
                   طالب موجود
                 </button>
+                <button
+                  onClick={() => setMode("stage")}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    mode === "stage"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-muted/80"
+                  }`}
+                >
+                  طلاب المرحلة
+                </button>
               </div>
             </div>
 
@@ -651,7 +700,82 @@ function AddStudentModal({
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {searchResults.map((student) => (
                         <div
-                          key={student.id || student._id}
+                          key={student.id}
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-sm font-bold text-primary">
+                                {student.name.charAt(0)}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium">{student.name}</p>
+                              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Mail className="w-3 h-3" />
+                                {student.email}
+                              </p>
+                              {student.phone && (
+                                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  {student.phone}
+                                </p>
+                              )}
+                              {student.grade && (
+                                <p className="text-sm text-muted-foreground">
+                                  {student.stage || ""} {student.stage && student.grade ? "•" : ""} {student.grade}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {student.hasPendingInvitation ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                              <CheckCircle2 className="w-4 h-4" />
+                              دعوة مُرسلة
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleAddExisting(student.id)}
+                              disabled={adding}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                            >
+                              <Send className="w-4 h-4" />
+                              {adding ? "جاري الإرسال..." : "إرسال دعوة"}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!searching && searchQuery && searchResults.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>لم يتم العثور على طلاب</p>
+                    </div>
+                  )}
+                </div>
+              ) : mode === "stage" ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg text-sm">
+                    <GraduationCap className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium">الطلاب في نفس المرحلة والصف:</span>
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-medium">
+                      {getStageLabel(groupStage) || "غير محدد"}
+                    </span>
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-medium">
+                      {groupGrade || "غير محدد"}
+                    </span>
+                  </div>
+
+                  {loadingStage ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : stageStudents.length > 0 ? (
+                    <div className="space-y-2 max-h-72 overflow-y-auto">
+                      {stageStudents.map((student) => (
+                        <div
+                          key={student.id}
                           className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
                           <div className="flex items-center gap-3">
@@ -674,21 +798,27 @@ function AddStudentModal({
                               )}
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleAddExisting(student.id || student._id!)}
-                            disabled={adding}
-                            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-                          >
-                            {adding ? "جاري الإضافة..." : "إضافة"}
-                          </button>
+                          {student.hasPendingInvitation ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                              <CheckCircle2 className="w-4 h-4" />
+                              دعوة مُرسلة
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleAddExisting(student.id)}
+                              disabled={adding}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                            >
+                              <Send className="w-4 h-4" />
+                              {adding ? "جاري الإرسال..." : "إرسال دعوة"}
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {!searching && searchQuery && searchResults.length === 0 && (
+                  ) : (
                     <div className="text-center py-8 text-muted-foreground">
-                      <p>لم يتم العثور على طلاب</p>
+                      <p>لا يوجد طلاب في نفس المرحلة والصف بعد</p>
                     </div>
                   )}
                 </div>

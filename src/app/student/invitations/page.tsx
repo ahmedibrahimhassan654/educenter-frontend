@@ -244,7 +244,7 @@ export default function StudentInvitations() {
           <p className="text-lg font-medium">لا توجد دعوات حالياً</p>
           <p className="text-muted-foreground mt-1">ستظهر الدعوات هنا عند إضافتك لمجموعات جديدة</p>
           <Link
-            href="/student/explore"
+            href="/groups"
             className="inline-flex items-center gap-2 mt-4 text-primary hover:underline"
           >
             استكشف المجموعات

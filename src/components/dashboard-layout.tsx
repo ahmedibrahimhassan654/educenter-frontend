@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Users,
   Wallet,
-  Search,
   BarChart3,
   FileText,
   Bell,
@@ -56,7 +55,6 @@ const unverifiedTeacherLinks: SidebarLink[] = [
 const studentLinks: SidebarLink[] = [
   { href: "/student", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
   { href: "/student/ai-study", label: "المعلم الذكي", icon: Sparkles, color: "learning" },
-  { href: "/student/explore", label: "استكشف المجموعات", icon: Search, color: "people" },
   { href: "/student/my-groups", label: "مجموعاتي", icon: Users, color: "people" },
   { href: "/student/invitations", label: "دعواتي", icon: UserPlus, color: "alert" },
   { href: "/student/my-progress", label: "تقدمي", icon: BarChart3, color: "progress" },

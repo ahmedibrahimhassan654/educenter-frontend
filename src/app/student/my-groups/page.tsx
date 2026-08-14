@@ -180,7 +180,7 @@ export default function StudentMyGroupsPage() {
               استكشف المجموعات المتاحة لمرحلتك وانضم إليها
             </p>
             <Link
-              href="/student/explore"
+              href="/groups"
               className="inline-flex items-center gap-2 mt-4 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
             >
               استكشف المجموعات
