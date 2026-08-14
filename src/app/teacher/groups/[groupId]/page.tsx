@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
@@ -22,7 +22,6 @@ import {
   Phone,
   GraduationCap,
   Send,
-  CheckCircle2,
 } from "lucide-react";
 
 interface SuggestedStudent {
@@ -33,7 +32,17 @@ interface SuggestedStudent {
   avatarUrl?: string;
   stage?: string;
   grade?: string;
-  hasPendingInvitation?: boolean;
+}
+
+interface PurchaseRecord {
+  _id: string;
+  studentId: { _id: string; name: string } | string;
+  type: "LECTURES" | "MONTHLY";
+  lectures: number;
+  remainingLectures: number;
+  monthlyExpiresAt?: string | null;
+  amountPaid: number;
+  createdAt: string;
 }
 
 export default function GroupDetailPage() {
@@ -48,6 +57,7 @@ export default function GroupDetailPage() {
     maxStudentsPerGroup: 25,
     platformFeePercentage: 15,
   });
+  const [groupPurchases, setGroupPurchases] = useState<PurchaseRecord[]>([]);
 
   const groupId = params.groupId as string;
 
@@ -68,6 +78,10 @@ export default function GroupDetailPage() {
   useEffect(() => {
     if (groupId) {
       fetchGroup();
+      api
+        .get(`/groups/${groupId}/purchases`)
+        .then((res) => setGroupPurchases(res.data?.data || []))
+        .catch(() => {});
     }
     const fetchCurriculum = async () => {
       try {
@@ -148,6 +162,31 @@ export default function GroupDetailPage() {
   };
 
   const canModify = group?.students.length === 0;
+
+  const purchasesByStudent = useMemo(() => {
+    const map: Record<string, PurchaseRecord[]> = {};
+    for (const p of groupPurchases) {
+      const sid = typeof p.studentId === "string" ? p.studentId : p.studentId?._id;
+      if (!sid) continue;
+      (map[sid] = map[sid] || []).push(p);
+    }
+    return map;
+  }, [groupPurchases]);
+
+  const entitlementFor = (studentId: string) => {
+    const list = purchasesByStudent[studentId] || [];
+    let credits = 0;
+    let monthlyUntil: string | null = null;
+    const now = Date.now();
+    for (const p of list) {
+      if (p.type === "LECTURES") credits += p.remainingLectures || 0;
+      else if (p.type === "MONTHLY" && p.monthlyExpiresAt) {
+        const exp = new Date(p.monthlyExpiresAt).getTime();
+        if (exp > now) monthlyUntil = p.monthlyExpiresAt;
+      }
+    }
+    return { credits, monthlyUntil, hasAccess: credits > 0 || !!monthlyUntil };
+  };
 
   if (loading) {
     return (
@@ -369,6 +408,29 @@ export default function GroupDetailPage() {
                         <p className="text-sm text-muted-foreground">
                           {studentEmail}
                         </p>
+                        {(() => {
+                          const ent = entitlementFor(studentId);
+                          if (ent.monthlyUntil) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                                اشتراك شهري حتى{" "}
+                                {new Date(ent.monthlyUntil).toLocaleDateString("ar-EG")}
+                              </span>
+                            );
+                          }
+                          if (ent.credits > 0) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-medium">
+                                {ent.credits} حصة متبقية
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
+                              لم يشترِ حصصاً
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     {canModify && (
@@ -545,17 +607,15 @@ function AddStudentModal({
     setAdding(true);
     try {
       await api.post(`/groups/${groupId}/students`, { studentId });
-      toast.success("تم إرسال الدعوة بنجاح");
-      const markPending = (list: SuggestedStudent[]) =>
-        list.map((s) =>
-          s.id === studentId ? { ...s, hasPendingInvitation: true } : s
-        );
-      setSearchResults(markPending);
-      setStageStudents(markPending);
+      toast.success("تمت إضافة الطالب للمجموعة");
+      const removeAdded = (list: SuggestedStudent[]) =>
+        list.filter((s) => s.id !== studentId);
+      setSearchResults(removeAdded);
+      setStageStudents(removeAdded);
       onStudentAdded();
     } catch (error) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      const message = axiosError.response?.data?.message || "فشل في إرسال الدعوة";
+      const message = axiosError.response?.data?.message || "فشل في إضافة الطالب";
       toast.error(message);
     } finally {
       setAdding(false);
@@ -728,21 +788,14 @@ function AddStudentModal({
                               )}
                             </div>
                           </div>
-                          {student.hasPendingInvitation ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
-                              <CheckCircle2 className="w-4 h-4" />
-                              دعوة مُرسلة
-                            </span>
-                          ) : (
-                            <button
+                          <button
                               onClick={() => handleAddExisting(student.id)}
                               disabled={adding}
                               className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                             >
                               <Send className="w-4 h-4" />
-                              {adding ? "جاري الإرسال..." : "إرسال دعوة"}
+                              {adding ? "جاري الإضافة..." : "إضافة للمجموعة"}
                             </button>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -798,21 +851,14 @@ function AddStudentModal({
                               )}
                             </div>
                           </div>
-                          {student.hasPendingInvitation ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
-                              <CheckCircle2 className="w-4 h-4" />
-                              دعوة مُرسلة
-                            </span>
-                          ) : (
-                            <button
+                          <button
                               onClick={() => handleAddExisting(student.id)}
                               disabled={adding}
                               className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                             >
                               <Send className="w-4 h-4" />
-                              {adding ? "جاري الإرسال..." : "إرسال دعوة"}
+                              {adding ? "جاري الإضافة..." : "إضافة للمجموعة"}
                             </button>
-                          )}
                         </div>
                       ))}
                     </div>

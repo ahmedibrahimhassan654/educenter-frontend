@@ -119,6 +119,30 @@ export interface PublicGroupDetail extends PublicGroup {
   updatedAt?: string;
 }
 
+export interface Entitlement {
+  remainingCredits: number;
+  monthlyActive: boolean;
+  monthlyExpiresAt: string | null;
+  hasAccess: boolean;
+}
+
+export interface PurchaseRecord {
+  id?: string;
+  _id?: string;
+  groupId: string;
+  studentId: string | { _id: string; name: string };
+  type: "LECTURES" | "MONTHLY";
+  lectures: number;
+  remainingLectures: number;
+  monthlyExpiresAt?: string | null;
+  unitPrice: number;
+  amountPaid: number;
+  teacherShareTotal: number;
+  platformFeeTotal: number;
+  status: "PAID";
+  createdAt: string;
+}
+
 export interface PublicTeacherProfile extends PublicTeacher {
   groups: PublicGroup[];
 }

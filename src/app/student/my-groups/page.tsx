@@ -100,13 +100,14 @@ export default function StudentMyGroupsPage() {
     return stageGroups.filter((g) => g.grade === selectedGrade);
   }, [stageGroups, selectedGrade]);
 
-  const renderGroupCard = (group: GroupItem) => {
+  const renderGroupCard = (group: GroupItem, target: "member" | "public" = "public") => {
     const id = groupId(group);
+    const href = target === "member" ? `/student/my-groups/${id}` : `/groups/${id}`;
     const subjectColor = getSubjectColor(group.subject);
     return (
       <Link
         key={id}
-        href={`/groups/${id}`}
+        href={href}
         className="bg-card border rounded-xl overflow-hidden hover:shadow-lg transition-shadow block"
       >
         <div className={`p-5 bg-gradient-to-br ${subjectColor.gradient}`}>
@@ -189,7 +190,7 @@ export default function StudentMyGroupsPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {joinedGroups.map(renderGroupCard)}
+            {joinedGroups.map((g) => renderGroupCard(g, "member"))}
           </div>
         )}
       </section>
@@ -228,7 +229,7 @@ export default function StudentMyGroupsPage() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredStageGroups.map(renderGroupCard)}
+              {filteredStageGroups.map((g) => renderGroupCard(g))}
             </div>
           )}
         </section>

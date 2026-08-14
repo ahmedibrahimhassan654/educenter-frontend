@@ -56,7 +56,7 @@ const studentLinks: SidebarLink[] = [
   { href: "/student", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
   { href: "/student/ai-study", label: "المعلم الذكي", icon: Sparkles, color: "learning" },
   { href: "/student/my-groups", label: "مجموعاتي", icon: Users, color: "people" },
-  { href: "/student/invitations", label: "دعواتي", icon: UserPlus, color: "alert" },
+  { href: "/student/invitations", label: "المجموعات المضافة", icon: UserPlus, color: "alert" },
   { href: "/student/my-progress", label: "تقدمي", icon: BarChart3, color: "progress" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
 ];
