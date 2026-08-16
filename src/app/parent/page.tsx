@@ -43,7 +43,7 @@ export default function ParentDashboard() {
       try {
         // Fetch all groups to find which ones the children are enrolled in
         const groupsRes = await api.get("/groups?explore=true");
-        setGroups(groupsRes.data);
+        setGroups(groupsRes.data?.data || groupsRes.data || []);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {

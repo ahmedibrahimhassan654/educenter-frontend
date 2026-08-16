@@ -39,7 +39,12 @@ export default function UserMenu() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -68,7 +73,9 @@ export default function UserMenu() {
     }
   };
 
-  if (isLoading) {
+  // Prevent hydration mismatch: show loading on server and initial client render,
+  // then render auth-dependent content after mount.
+  if (!mounted || isLoading) {
     return (
       <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
     );
