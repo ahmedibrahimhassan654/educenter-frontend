@@ -7,6 +7,33 @@ export interface VerificationData {
 
 export type VerificationStatus = "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
 
+export type UserRole = "TEACHER" | "STUDENT" | "PARENT" | "ADMIN";
+
+export interface FamilyUserRef {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  avatarUrl?: string;
+  role?: UserRole;
+  stage?: string;
+  grade?: string;
+}
+
+export interface ParentChildInvitation {
+  _id: string;
+  senderId: FamilyUserRef | string;
+  senderRole: "PARENT" | "STUDENT";
+  targetUserId: FamilyUserRef | string;
+  targetEmail?: string;
+  targetPhone?: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED";
+  message?: string;
+  respondedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface User {
   id: string;
   _id?: string;
@@ -14,9 +41,9 @@ export interface User {
   email: string;
   phone: string;
   avatarUrl?: string;
-  role: "TEACHER" | "STUDENT" | "PARENT" | "ADMIN";
-  parentId?: string;
-  students?: string[];
+  role: UserRole;
+  parentId?: string | FamilyUserRef;
+  students?: Array<string | FamilyUserRef>;
   groups?: string[];
   stage?: string;
   grade?: string;

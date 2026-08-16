@@ -38,6 +38,7 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered") === "1";
+  const next = searchParams.get("next");
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -75,6 +76,13 @@ export default function LoginPage() {
         redirectPath = "/teacher/verification";
       } else if (user.role === "STUDENT" && !user.stage) {
         redirectPath = "/student/onboarding";
+      } else if (
+        next &&
+        next.startsWith("/") &&
+        !next.startsWith("//") &&
+        !next.includes("\\")
+      ) {
+        redirectPath = next;
       }
 
       toast.success("تم تسجيل الدخول بنجاح", {

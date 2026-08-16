@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Loader2,
   Users,
+  UserPlus,
 } from "lucide-react";
 
 interface Student {
@@ -94,7 +95,16 @@ export default function ParentDashboard() {
           <div className="text-center py-16 bg-card border rounded-xl">
             <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-xl font-bold mb-2">لم تربط أي طالب بعد</h3>
-            <p className="text-muted-foreground mb-4">استخدم رمز الربط لربط حساب طفلك بحسابك</p>
+            <p className="text-muted-foreground mb-6">
+              أرسل دعوة لطفلك بالبريد الإلكتروني أو رقم الهاتف لربط حسابه بحسابك
+            </p>
+            <Link
+              href="/parent/family"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:bg-primary/90 transition-colors"
+            >
+              <UserPlus className="w-5 h-5" />
+              ربط طالب جديد
+            </Link>
           </div>
         </div>
       </>

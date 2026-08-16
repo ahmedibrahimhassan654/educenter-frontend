@@ -46,6 +46,7 @@ const categoryLabels: Record<string, string> = {
   GROUP: "مجموعات",
   SESSION: "حصص",
   ATTENDANCE: "حضور",
+  FAMILY: "العائلة",
   SYSTEM: "نظام",
 };
 

@@ -10,7 +10,7 @@ export interface Notification {
   title: string;
   message: string;
   type: "INFO" | "SUCCESS" | "WARNING" | "ERROR" | "SYSTEM";
-  category: "GENERAL" | "USER" | "PAYMENT" | "GROUP" | "SESSION" | "ATTENDANCE" | "SYSTEM";
+  category: "GENERAL" | "USER" | "PAYMENT" | "GROUP" | "SESSION" | "ATTENDANCE" | "SYSTEM" | "FAMILY";
   isRead: boolean;
   link?: string;
   metadata?: Record<string, any>;

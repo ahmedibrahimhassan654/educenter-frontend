@@ -60,11 +60,13 @@ const studentLinks: SidebarLink[] = [
   { href: "/student/my-groups", label: "مجموعاتي", icon: Users, color: "people" },
   { href: "/student/invitations", label: "المجموعات المضافة", icon: UserPlus, color: "alert" },
   { href: "/student/my-progress", label: "تقدمي", icon: BarChart3, color: "progress" },
+  { href: "/student/family", label: "العائلة", icon: Users, color: "people" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
 ];
 
 const parentLinks: SidebarLink[] = [
   { href: "/parent", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
+  { href: "/parent/family", label: "العائلة", icon: Users, color: "people" },
   { href: "/parent/payments", label: "المدفوعات", icon: Wallet, color: "money" },
   { href: "/parent/reports", label: "التقارير", icon: FileText, color: "document" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
