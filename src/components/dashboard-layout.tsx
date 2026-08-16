@@ -70,6 +70,7 @@ const parentLinks: SidebarLink[] = [
   { href: "/parent/payments", label: "المدفوعات", icon: Wallet, color: "money" },
   { href: "/parent/reports", label: "التقارير", icon: FileText, color: "document" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
+  { href: "/parent/profile", label: "الملف الشخصي", icon: UserCircle, color: "neutral" },
 ];
 
 const adminLinks: SidebarLink[] = [

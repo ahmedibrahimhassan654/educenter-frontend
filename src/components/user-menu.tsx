@@ -32,6 +32,7 @@ const roleProfiles: Record<string, string> = {
   ADMIN: "/admin/profile",
   TEACHER: "/teacher/profile",
   STUDENT: "/student/profile",
+  PARENT: "/parent/profile",
 };
 
 export default function UserMenu() {

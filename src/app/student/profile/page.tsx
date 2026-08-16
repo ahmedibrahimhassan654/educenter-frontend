@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,7 @@ import {
   Loader2,
   Bookmark,
   Target,
+  UserPlus,
 } from "lucide-react";
 
 export default function StudentProfilePage() {
@@ -358,6 +360,49 @@ export default function StudentProfilePage() {
                   <p className="text-sm text-muted-foreground">
                     لا يوجد سجل أكاديمي بعد. سيتم تسجيل تاريخك الدراسي عند الترقية إلى مرحلة أعلى.
                   </p>
+                </div>
+              )}
+            </div>
+
+            {/* Parent */}
+            <div className="bg-card border rounded-xl overflow-hidden">
+              <div className="p-5 border-b flex items-center gap-2">
+                <Users className="w-4 h-4 text-cyan-600" />
+                <h4 className="font-semibold">ولي الأمر</h4>
+              </div>
+              {typeof (user as any)?.parentId === "object" && (user as any)?.parentId ? (
+                <div className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={(user as any).parentId.avatarUrl || ""} alt={(user as any).parentId.name} />
+                      <AvatarFallback className="bg-cyan-500/10 text-cyan-600 font-bold text-sm">
+                        {(user as any).parentId.name ? getInitials((user as any).parentId.name) : "و"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium truncate">{(user as any).parentId.name}</p>
+                        <Badge variant="default" className="bg-cyan-500/10 text-cyan-600 hover:bg-cyan-500/20">
+                          ولي أمر
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate" dir="ltr">
+                        {(user as any).parentId.email || (user as any).parentId.phone || ""}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 text-center">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    لم يتم ربط ولي الأمر بعد
+                  </p>
+                  <Link href="/student/family">
+                    <Button size="sm" className="gap-2 bg-cyan-600 hover:bg-cyan-700">
+                      <UserPlus className="w-4 h-4" />
+                      دعوة ولي الأمر
+                    </Button>
+                  </Link>
                 </div>
               )}
             </div>

@@ -96,6 +96,15 @@ interface TeacherGroupsSummary {
   };
 }
 
+interface ParentChild {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  stage?: string;
+  grade?: string;
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -122,6 +131,8 @@ export default function AdminUsersPage() {
   const [showViewModal, setShowViewModal] = useState<User | null>(null);
   const [teacherGroups, setTeacherGroups] = useState<TeacherGroupsSummary | null>(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [parentChildren, setParentChildren] = useState<ParentChild[]>([]);
+  const [isLoadingChildren, setIsLoadingChildren] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -241,21 +252,35 @@ export default function AdminUsersPage() {
     setShowModal(true);
   };
 
-  // Open the details modal, loading group data for teachers
+  // Open the details modal, loading group data for teachers and children for parents
   const openViewModal = async (user: User) => {
     setShowViewModal(user);
     setTeacherGroups(null);
+    setParentChildren([]);
 
-    if (user.role !== "TEACHER") return;
+    if (user.role === "TEACHER") {
+      setIsLoadingGroups(true);
+      try {
+        const response = await api.get(`/groups/teacher/${user._id}/summary`);
+        setTeacherGroups(response.data?.data || null);
+      } catch {
+        toast.error("تعذر تحميل بيانات المجموعات");
+      } finally {
+        setIsLoadingGroups(false);
+      }
+      return;
+    }
 
-    setIsLoadingGroups(true);
-    try {
-      const response = await api.get(`/groups/teacher/${user._id}/summary`);
-      setTeacherGroups(response.data?.data || null);
-    } catch {
-      toast.error("تعذر تحميل بيانات المجموعات");
-    } finally {
-      setIsLoadingGroups(false);
+    if (user.role === "PARENT") {
+      setIsLoadingChildren(true);
+      try {
+        const response = await api.get(`/users/${user._id}`);
+        setParentChildren(response.data?.data?.students || []);
+      } catch {
+        toast.error("تعذر تحميل بيانات الأبناء");
+      } finally {
+        setIsLoadingChildren(false);
+      }
     }
   };
 
@@ -897,6 +922,54 @@ export default function AdminUsersPage() {
                       <p className="text-sm font-medium">{showViewModal.grade || "—"}</p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Parent-specific info */}
+              {showViewModal.role === "PARENT" && (
+                <div className="p-2.5 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                    <Users className="w-3 h-3 text-orange-500" /> الأبناء ({parentChildren.length})
+                  </p>
+
+                  {isLoadingChildren ? (
+                    <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      جاري تحميل الأبناء...
+                    </div>
+                  ) : parentChildren.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-1">
+                      لم يربط هذا الحساب أي طالب بعد
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {parentChildren.map((child) => (
+                        <div
+                          key={child._id}
+                          className="p-2.5 bg-background rounded-lg border flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {child.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate" dir="ltr">
+                              {child.email || child.phone || ""}
+                            </p>
+                          </div>
+                          {(child.stage || child.grade) && (
+                            <span className="shrink-0">
+                              <Badge
+                                variant="outline"
+                                className="bg-green-500/10 text-green-600 border-0 text-xs"
+                              >
+                                {child.grade || child.stage}
+                              </Badge>
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
