@@ -32,6 +32,7 @@ interface GroupInvitation {
   grade: string;
   subject: string;
   status?: "PENDING" | "ACCEPTED" | "REJECTED";
+  isMember?: boolean;
   createdAt: string;
 }
 
@@ -82,15 +83,18 @@ export default function StudentInvitations() {
         <div className="grid md:grid-cols-2 gap-6">
           {acceptedInvitations.map((invitation) => {
             const groupIdValue = invitation.groupId?._id || "";
+            const isMember = invitation.isMember !== false;
             return (
               <div
                 key={invitation._id}
-                className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow border-l-4 border-l-primary"
+                className={`bg-card border rounded-xl p-6 hover:shadow-md transition-shadow ${
+                  isMember ? "border-l-4 border-l-primary" : "border-l-4 border-l-muted opacity-80"
+                }`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <Mail className="w-6 h-6 text-primary" />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isMember ? "bg-primary/10" : "bg-muted"}`}>
+                      <Mail className={`w-6 h-6 ${isMember ? "text-primary" : "text-muted-foreground"}`} />
                     </div>
                     <div>
                       <h4 className="text-lg font-bold">
@@ -101,10 +105,25 @@ export default function StudentInvitations() {
                       </p>
                     </div>
                   </div>
-                  <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-sm font-medium">
-                    أُضيف إليها
-                  </span>
+                  {isMember ? (
+                    <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-sm font-medium">
+                      أُضيف إليها
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm font-medium">
+                      لم تعد عضواً
+                    </span>
+                  )}
                 </div>
+
+                {!isMember && (
+                  <div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                    <Users className="w-4 h-4 shrink-0" />
+                    <span>
+                      تمت إزالتك من هذه المجموعة أو ألغيت اشتراكك. يمكنك إعادة الانضمام عبر إرسال طلب من صفحة المجموعة.
+                    </span>
+                  </div>
+                )}
 
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -132,11 +151,15 @@ export default function StudentInvitations() {
                 </div>
 
                 <Link
-                  href={groupIdValue ? `/student/my-groups/${groupIdValue}` : "/student/my-groups"}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                  href={isMember && groupIdValue ? `/student/my-groups/${groupIdValue}` : groupIdValue ? `/groups/${groupIdValue}` : isMember ? "/student/my-groups" : "/student/explore"}
+                  className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isMember
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "border border-primary/40 text-primary hover:bg-primary/10"
+                  }`}
                 >
                   <Video className="w-4 h-4" />
-                  عرض المجموعة
+                  {isMember ? "عرض المجموعة" : "عرض المجموعة وإعادة الانضمام"}
                   <ArrowLeft className="w-4 h-4" />
                 </Link>
               </div>
