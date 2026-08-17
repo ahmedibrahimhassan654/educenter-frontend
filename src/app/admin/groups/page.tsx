@@ -18,6 +18,8 @@ import {
   Eye,
   ChevronDown,
   ChevronRight,
+  CheckCircle2,
+  PlayCircle,
 } from "lucide-react";
 import { iconChip, iconColor } from "@/lib/icon-styles";
 
@@ -34,6 +36,8 @@ interface GroupData {
   maxStudentsPerGroup: number;
   studentsCount: number;
   scheduleDays: string[];
+  learningPoints?: string[];
+  descriptionVideo?: string;
   teacherId: {
     _id: string;
     name: string;
@@ -278,6 +282,41 @@ export default function AdminGroupsPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Learning Points */}
+                  {(group.learningPoints || []).length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                        ماذا ستتعلم في هذه المجموعة؟
+                      </p>
+                      <ul className="space-y-1.5">
+                        {group.learningPoints?.map((point, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0 mt-0.5">
+                              {i + 1}
+                            </span>
+                            <span className="text-muted-foreground">{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Description Video */}
+                  {group.descriptionVideo && (
+                    <div className="mb-4">
+                      <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <PlayCircle className="w-4 h-4 text-primary" />
+                        فيديو وصف المجموعة
+                      </p>
+                      <video
+                        src={group.descriptionVideo}
+                        controls
+                        className="w-full rounded-lg max-h-72 bg-muted"
+                      />
+                    </div>
+                  )}
 
                   {/* Teacher Info */}
                   <div className="p-4 bg-background rounded-lg border">

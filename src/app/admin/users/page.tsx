@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import api, { clearCache } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -105,6 +106,14 @@ interface ParentChild {
   grade?: string;
 }
 
+interface ParentInfo {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  avatarUrl?: string;
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -133,6 +142,8 @@ export default function AdminUsersPage() {
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [parentChildren, setParentChildren] = useState<ParentChild[]>([]);
   const [isLoadingChildren, setIsLoadingChildren] = useState(false);
+  const [parentInfo, setParentInfo] = useState<ParentInfo | null>(null);
+  const [isLoadingParentInfo, setIsLoadingParentInfo] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -257,6 +268,7 @@ export default function AdminUsersPage() {
     setShowViewModal(user);
     setTeacherGroups(null);
     setParentChildren([]);
+    setParentInfo(null);
 
     if (user.role === "TEACHER") {
       setIsLoadingGroups(true);
@@ -271,13 +283,17 @@ export default function AdminUsersPage() {
       return;
     }
 
-    if (user.role === "PARENT") {
+    if (user.role === "PARENT" || user.role === "STUDENT") {
       setIsLoadingChildren(true);
       try {
         const response = await api.get(`/users/${user._id}`);
-        setParentChildren(response.data?.data?.students || []);
+        if (user.role === "PARENT") {
+          setParentChildren(response.data?.data?.students || []);
+        } else {
+          setParentInfo(response.data?.data?.parentId || null);
+        }
       } catch {
-        toast.error("تعذر تحميل بيانات الأبناء");
+        toast.error("تعذر تحميل بيانات العائلة");
       } finally {
         setIsLoadingChildren(false);
       }
@@ -922,6 +938,44 @@ export default function AdminUsersPage() {
                       <p className="text-sm font-medium">{showViewModal.grade || "—"}</p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Student parent info */}
+              {showViewModal.role === "STUDENT" && (
+                <div className="p-2.5 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                    <Users className="w-3 h-3 text-cyan-500" /> ولي الأمر
+                  </p>
+
+                  {isLoadingChildren ? (
+                    <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      جاري تحميل بيانات ولي الأمر...
+                    </div>
+                  ) : !parentInfo ? (
+                    <p className="text-sm text-muted-foreground py-1">
+                      لم يربط هذا الطالب أي ولي أمر بعد
+                    </p>
+                  ) : (
+                    <div className="p-2.5 bg-background rounded-lg border flex items-center gap-3">
+                      <Avatar className="w-11 h-11">
+                        <AvatarImage src={parentInfo.avatarUrl || ""} alt={parentInfo.name} />
+                        <AvatarFallback className="bg-cyan-500/10 text-cyan-600 font-bold text-sm">
+                          {parentInfo.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{parentInfo.name}</p>
+                        <p className="text-xs text-muted-foreground truncate" dir="ltr">
+                          {parentInfo.email || ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate" dir="ltr">
+                          {parentInfo.phone || "—"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

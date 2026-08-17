@@ -17,6 +17,7 @@ import {
   Shield,
   XCircle,
   AlertCircle,
+  Hourglass,
 } from "lucide-react";
 
 export default function TeacherDashboard() {
@@ -25,6 +26,7 @@ export default function TeacherDashboard() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [stats, setStats] = useState({ totalGroups: 0, totalStudents: 0, totalEarnings: 0 });
   const [loading, setLoading] = useState(true);
+  const [pendingByGroup, setPendingByGroup] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,6 +49,19 @@ export default function TeacherDashboard() {
     };
 
     fetchData();
+
+    api
+      .get("/groups/join-requests")
+      .then((res) => {
+        const requests = res.data?.data || [];
+        const counts: Record<string, number> = {};
+        for (const r of requests) {
+          const gid = r.group?._id || r.group?.id || r.group;
+          if (gid) counts[gid] = (counts[gid] || 0) + 1;
+        }
+        setPendingByGroup(counts);
+      })
+      .catch(() => {});
   }, []);
 
   const upcomingSessions = sessions
@@ -56,6 +71,7 @@ export default function TeacherDashboard() {
 
   const totalStudents = stats.totalStudents;
   const totalEarnings = stats.totalEarnings;
+  const totalPending = Object.values(pendingByGroup).reduce((a, b) => a + b, 0);
 
   if (loading) {
     return (
@@ -99,6 +115,28 @@ export default function TeacherDashboard() {
                   className="text-sm text-red-800 dark:text-red-300 font-medium hover:underline mt-2 inline-block"
                 >
                   إعادة تقديم الطلب ←
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {totalPending > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <Hourglass className={`w-5 h-5 text-amber-500 mt-0.5`} />
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-800 dark:text-amber-300">
+                  لديك {totalPending} طلب انضمام قيد المراجعة
+                </h3>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                  طلاب ينتظرون موافقتك للانضمام إلى مجموعاتك.
+                </p>
+                <Link
+                  href="/teacher/groups"
+                  className="text-sm text-amber-800 dark:text-amber-300 font-medium hover:underline mt-2 inline-block"
+                >
+                  مراجعة الطلبات ←
                 </Link>
               </div>
             </div>
@@ -224,21 +262,34 @@ export default function TeacherDashboard() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groups.map((group) => (
-                <div key={group._id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                  <h4 className="font-semibold mb-2">{group.title}</h4>
-                  <p className="text-sm text-muted-foreground mb-3">{group.subject} • {group.grade}</p>
-                  <div className="flex items-center justify-between">
-                     <span className="text-sm">{group.studentsCount || 0} طالب</span>
-                    <Link
-                      href={`/teacher/groups/${group._id}/attendance`}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      التفاصيل
-                    </Link>
+              {groups.map((group) => {
+                const gid = (group._id || group.id) as string;
+                const pendingCount = gid ? pendingByGroup[gid] || 0 : 0;
+                return (
+                  <div key={group._id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                    <h4 className="font-semibold mb-2">{group.title}</h4>
+                    <p className="text-sm text-muted-foreground mb-3">{group.subject} • {group.grade}</p>
+                    <div className="flex items-center justify-between">
+                       <span className="text-sm">{group.studentsCount || 0} طالب</span>
+                      <Link
+                        href={`/teacher/groups/${group._id}`}
+                        className="text-sm text-primary hover:underline"
+                      >
+                        التفاصيل
+                      </Link>
+                    </div>
+                    {pendingCount > 0 && (
+                      <Link
+                        href={`/teacher/groups/${gid}`}
+                        className="inline-flex items-center gap-1.5 mt-3 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-colors"
+                      >
+                        <Hourglass className="w-3.5 h-3.5" />
+                        طلبات انضمام ({pendingCount})
+                      </Link>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

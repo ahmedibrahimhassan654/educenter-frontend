@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { Group, Entitlement } from "@/types";
@@ -24,6 +25,7 @@ import {
   Sparkles,
   CheckCircle2,
   Video,
+  LogOut,
 } from "lucide-react";
 
 interface PurchasePayload {
@@ -34,6 +36,7 @@ interface PurchasePayload {
 export default function StudentGroupPage() {
   const params = useParams();
   useAuth();
+  const router = useRouter();
   const groupId = params.groupId as string;
 
   const [group, setGroup] = useState<Group | null>(null);
@@ -41,6 +44,8 @@ export default function StudentGroupPage() {
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [selectedPack, setSelectedPack] = useState(4);
+  const [leaving, setLeaving] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
@@ -60,6 +65,22 @@ export default function StudentGroupPage() {
   useEffect(() => {
     fetchGroup();
   }, [fetchGroup]);
+
+  const handleLeave = async () => {
+    setLeaving(true);
+    try {
+      await api.delete(`/groups/${groupId}/membership`);
+      toast.success("تم إلغاء اشتراكك في المجموعة");
+      router.push("/student/my-groups");
+    } catch (error) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(
+        axiosError.response?.data?.message || "حدث خطأ أثناء إلغاء الاشتراك"
+      );
+    } finally {
+      setLeaving(false);
+    }
+  };
 
   const handleBuy = async (payload: PurchasePayload) => {
     setBuying(true);
@@ -267,6 +288,45 @@ export default function StudentGroupPage() {
             )}
           </div>
 
+          {/* Learning Points */}
+          {(group.learningPoints || []).length > 0 && (
+            <div className="bg-card border rounded-2xl p-6">
+              <h3 className="font-cairo text-lg font-extrabold mb-4 flex items-center gap-2">
+                <span className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-violet-500" />
+                </span>
+                ماذا ستتعلم في هذه المجموعة؟
+              </h3>
+              <ul className="space-y-3">
+                {group.learningPoints!.map((point, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">
+                      {i + 1}
+                    </div>
+                    <span className="text-sm text-muted-foreground">{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Description Video */}
+          {group.descriptionVideo && (
+            <div className="bg-card border rounded-2xl p-6">
+              <h3 className="font-cairo text-lg font-extrabold mb-4 flex items-center gap-2">
+                <span className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                  <Video className="w-5 h-5 text-cyan-500" />
+                </span>
+                فيديو وصف المجموعة
+              </h3>
+              <video
+                src={group.descriptionVideo}
+                controls
+                className="w-full rounded-xl max-h-96 bg-muted"
+              />
+            </div>
+          )}
+
           {/* Meet link */}
           <div className="bg-card border rounded-2xl p-6">
             <h3 className="font-cairo text-lg font-extrabold mb-4 flex items-center gap-2">
@@ -412,6 +472,44 @@ export default function StudentGroupPage() {
                 <span className="font-bold">{weekly}</span>
               </div>
             </div>
+          </div>
+
+          {/* Leave group */}
+          <div className="bg-card border border-red-500/20 rounded-2xl p-6">
+            <h3 className="font-cairo text-lg font-extrabold mb-2 flex items-center gap-2 text-red-600 dark:text-red-400">
+              <LogOut className="w-5 h-5" />
+              إلغاء الاشتراك
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              بإلغاء اشتراكك ستغادر المجموعة وتُلغى حصصك المتبقية. يمكنك إرسال
+              طلب انضمام جديد لاحقاً.
+            </p>
+            <button
+              onClick={() => {
+                if (!confirmLeave) {
+                  setConfirmLeave(true);
+                  return;
+                }
+                handleLeave();
+              }}
+              disabled={leaving}
+              className={`w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-base font-bold transition-all disabled:opacity-50 ${
+                confirmLeave
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : "border-2 border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10"
+              }`}
+            >
+              {leaving ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <LogOut className="w-5 h-5" />
+              )}
+              {leaving
+                ? "جارٍ الإلغاء..."
+                : confirmLeave
+                ? "هل أنت متأكد؟ اضغط للتأكيد"
+                : "إلغاء الاشتراك في المجموعة"}
+            </button>
           </div>
         </aside>
       </div>

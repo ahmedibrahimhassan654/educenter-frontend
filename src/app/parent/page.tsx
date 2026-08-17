@@ -14,6 +14,7 @@ import {
   Loader2,
   Users,
   UserPlus,
+  PlayCircle,
 } from "lucide-react";
 
 interface Student {
@@ -30,6 +31,8 @@ interface Group {
   grade: string;
   teacherId: { name: string };
   students: string[];
+  learningPoints?: string[];
+  descriptionVideo?: string;
 }
 
 export default function ParentDashboard() {
@@ -194,6 +197,7 @@ export default function ParentDashboard() {
                     <th className="text-right py-4 px-6 text-base font-medium text-muted-foreground">المجموعة</th>
                     <th className="text-right py-4 px-6 text-base font-medium text-muted-foreground">المعلم</th>
                     <th className="text-right py-4 px-6 text-base font-medium text-muted-foreground">الصف</th>
+                    <th className="text-right py-4 px-6 text-base font-medium text-muted-foreground">ماذا ستتعلم؟</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,11 +206,28 @@ export default function ParentDashboard() {
                       <td className="py-4 px-6">
                         <div>
                           <p className="text-base font-medium">{group.title}</p>
-                          <p className="text-sm text-muted-foreground">{group.subject}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {group.subject}
+                            {group.descriptionVideo && (
+                              <span className="inline-flex items-center gap-1 mr-2 text-xs text-primary">
+                                <PlayCircle className="w-3.5 h-3.5" />
+                                فيديو
+                              </span>
+                            )}
+                          </p>
                         </div>
                       </td>
                       <td className="py-4 px-6"><p className="text-base">{getTeacherName(group)}</p></td>
                       <td className="py-4 px-6"><p className="text-base">{group.grade}</p></td>
+                      <td className="py-4 px-6">
+                        {(group.learningPoints || []).length > 0 ? (
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {group.learningPoints![0]}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">—</p>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

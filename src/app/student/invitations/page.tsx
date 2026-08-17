@@ -16,18 +16,18 @@ import {
 
 interface GroupInvitation {
   _id: string;
-  groupId: {
+  groupId?: {
     _id: string;
     title: string;
     subject: string;
     grade: string;
     stage?: string;
-    scheduleDays?: string;
-  };
-  teacherId: {
+    scheduleDays?: string[];
+  } | null;
+  teacherId?: {
     name: string;
     email: string;
-  };
+  } | null;
   stage: string;
   grade: string;
   subject: string;
@@ -81,7 +81,7 @@ export default function StudentInvitations() {
       {acceptedInvitations.length > 0 ? (
         <div className="grid md:grid-cols-2 gap-6">
           {acceptedInvitations.map((invitation) => {
-            const groupIdValue = invitation.groupId._id || "";
+            const groupIdValue = invitation.groupId?._id || "";
             return (
               <div
                 key={invitation._id}
@@ -93,8 +93,12 @@ export default function StudentInvitations() {
                       <Mail className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <h4 className="text-lg font-bold">{invitation.groupId.title}</h4>
-                      <p className="text-sm text-muted-foreground">{invitation.subject}</p>
+                      <h4 className="text-lg font-bold">
+                        {invitation.groupId?.title || "مجموعة"}
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        {invitation.subject || invitation.groupId?.subject}
+                      </p>
                     </div>
                   </div>
                   <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-sm font-medium">
@@ -105,7 +109,7 @@ export default function StudentInvitations() {
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="w-4 h-4" />
-                    <span>المعلم: {invitation.teacherId.name}</span>
+                    <span>المعلم: {invitation.teacherId?.name || "غير محدد"}</span>
                   </div>
                   {invitation.stage && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -119,10 +123,10 @@ export default function StudentInvitations() {
                       <span>الصف: {invitation.grade}</span>
                     </div>
                   )}
-                  {invitation.groupId.scheduleDays && (
+                  {(invitation.groupId?.scheduleDays || []).length > 0 && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="w-4 h-4" />
-                      <span>المواعيد: {invitation.groupId.scheduleDays}</span>
+                      <span>المواعيد: {(invitation.groupId!.scheduleDays || []).join("، ")}</span>
                     </div>
                   )}
                 </div>

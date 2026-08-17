@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import api from "@/lib/api";
 import { Group } from "@/types";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   Users,
@@ -22,6 +23,10 @@ import {
   Phone,
   GraduationCap,
   Send,
+  CheckCircle,
+  Check,
+  Hourglass,
+  PlayCircle,
 } from "lucide-react";
 
 interface SuggestedStudent {
@@ -45,12 +50,23 @@ interface PurchaseRecord {
   createdAt: string;
 }
 
+interface JoinRequestRecord {
+  id: string;
+  student:
+    | { _id: string; name: string; email?: string; phone?: string; avatarUrl?: string; stage?: string; grade?: string }
+    | string;
+  createdAt: string;
+}
+
 export default function GroupDetailPage() {
   const params = useParams();
+  const router = useRouter();
   useAuth();
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingGroup, setIsDeletingGroup] = useState(false);
   const [curriculumTree, setCurriculumTree] = useState<Array<{ name: string; grades?: Array<{ name: string; subjects?: Array<{ code: string; name: string }> }> }>>([]);
   const [platformSettings, setPlatformSettings] = useState({
     defaultPricePerLecture: 60,
@@ -58,6 +74,8 @@ export default function GroupDetailPage() {
     platformFeePercentage: 15,
   });
   const [groupPurchases, setGroupPurchases] = useState<PurchaseRecord[]>([]);
+  const [joinRequests, setJoinRequests] = useState<JoinRequestRecord[]>([]);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
 
   const groupId = params.groupId as string;
 
@@ -81,6 +99,10 @@ export default function GroupDetailPage() {
       api
         .get(`/groups/${groupId}/purchases`)
         .then((res) => setGroupPurchases(res.data?.data || []))
+        .catch(() => {});
+      api
+        .get(`/groups/${groupId}/join-requests`)
+        .then((res) => setJoinRequests(res.data?.data || []))
         .catch(() => {});
     }
     const fetchCurriculum = async () => {
@@ -161,7 +183,42 @@ export default function GroupDetailPage() {
     }
   };
 
-  const canModify = group?.students.length === 0;
+  const handleJoinRequest = async (requestId: string, action: "accept" | "reject") => {
+    setProcessingRequestId(requestId);
+    try {
+      await api.post(`/groups/join-requests/${requestId}/${action}`);
+      toast.success(
+        action === "accept"
+          ? "تم قبول الطلب وانضم الطالب للمجموعة"
+          : "تم رفض الطلب"
+      );
+      setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+      fetchGroup();
+    } catch (error) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(
+        axiosError.response?.data?.message || "حدث خطأ أثناء معالجة الطلب"
+      );
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!groupId) return;
+    setIsDeletingGroup(true);
+    try {
+      await api.delete(`/groups/${groupId}`);
+      toast.success("تم حذف المجموعة بنجاح");
+      router.push("/teacher/groups");
+    } catch (error: any) {
+      const message = error.response?.data?.message || "فشل في حذف المجموعة";
+      toast.error(message);
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeletingGroup(false);
+    }
+  };
 
   const purchasesByStudent = useMemo(() => {
     const map: Record<string, PurchaseRecord[]> = {};
@@ -259,19 +316,25 @@ export default function GroupDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {canModify && (
-              <AddStudentModal
-                groupId={groupId}
-                groupTitle={group.title}
-                groupSubject={group.subject}
-                groupStage={group.stage}
-                groupGrade={group.grade}
-                scheduleDays={group.scheduleDays || []}
-                onStudentAdded={fetchGroup}
-                maxStudents={group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}
-                currentStudents={group.students.length}
-              />
-            )}
+            <AddStudentModal
+              groupId={groupId}
+              groupTitle={group.title}
+              groupSubject={group.subject}
+              groupStage={group.stage}
+              groupGrade={group.grade}
+              scheduleDays={group.scheduleDays || []}
+              onStudentAdded={fetchGroup}
+              maxStudents={group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}
+              currentStudents={group.students.length}
+            />
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-500/10 border-red-500/30"
+            >
+              <Trash2 className="w-4 h-4" />
+              حذف
+            </Button>
           </div>
         </div>
 
@@ -295,9 +358,6 @@ export default function GroupDetailPage() {
                 style={{ width: `${Math.min((group.students.length / (group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup)) * 100, 100)}%` }}
               />
             </div>
-            {group.students.length > 0 && (
-              <p className="text-xs text-amber-500 mt-2">⚠ لا يمكن تعديل أو حذف المجموعة</p>
-            )}
           </div>
 
           <div className="bg-card border rounded-xl p-6">
@@ -346,6 +406,80 @@ export default function GroupDetailPage() {
           </div>
         </div>
 
+        {/* Join requests */}
+        {joinRequests.length > 0 && (
+          <div className="bg-card border border-amber-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <span className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <Hourglass className="w-5 h-5 text-amber-500" />
+                </span>
+                طلبات الانضمام ({joinRequests.length})
+              </h3>
+            </div>
+            <div className="space-y-3">
+              {joinRequests.map((req) => {
+                const student = typeof req.student === "object" ? req.student : null;
+                const name = student?.name || "طالب";
+                return (
+                  <div
+                    key={req.id}
+                    className="flex flex-wrap items-center gap-4 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20"
+                  >
+                    <div className="w-11 h-11 rounded-full bg-amber-500/15 flex items-center justify-center text-lg font-bold text-amber-600 dark:text-amber-400">
+                      {name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold">{name}</p>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground mt-0.5">
+                        {student?.email && (
+                          <span className="flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5" />
+                            {student.email}
+                          </span>
+                        )}
+                        {student?.phone && (
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5" />
+                            {student.phone}
+                          </span>
+                        )}
+                        {student?.grade && <span>الصف: {student.grade}</span>}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(req.createdAt).toLocaleDateString("ar-EG")}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => handleJoinRequest(req.id, "accept")}
+                        disabled={processingRequestId === req.id}
+                        className="gap-2"
+                      >
+                        {processingRequestId === req.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
+                        قبول
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleJoinRequest(req.id, "reject")}
+                        disabled={processingRequestId === req.id}
+                        className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-500/10 border-red-500/30"
+                      >
+                        <X className="w-4 h-4" />
+                        رفض
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Schedule */}
         <div className="bg-card border rounded-xl p-6">
           <h3 className="text-lg font-bold mb-4">مواعيد الحصص الأسبوعية</h3>
@@ -366,11 +500,43 @@ export default function GroupDetailPage() {
           )}
         </div>
 
+        {/* Learning Points */}
+        {(group.learningPoints || []).length > 0 && (
+          <div className="bg-card border rounded-xl p-6">
+            <h3 className="text-lg font-bold mb-4">ماذا ستتعلم في هذه المجموعة؟</h3>
+            <ul className="space-y-3">
+              {group.learningPoints!.map((point, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0 mt-0.5">
+                    {i + 1}
+                  </div>
+                  <span className="text-sm text-muted-foreground">{point}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Description Video */}
+        {group.descriptionVideo && (
+          <div className="bg-card border rounded-xl p-6">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <PlayCircle className="w-5 h-5 text-primary" />
+              فيديو وصف المجموعة
+            </h3>
+            <video
+              src={group.descriptionVideo}
+              controls
+              className="w-full rounded-lg max-h-96 bg-muted"
+            />
+          </div>
+        )}
+
         {/* Students List */}
         <div className="bg-card border rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold">قائمة الطلاب ({group.students.length})</h3>
-            {canModify && group.students.length < (group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup) && (
+            {group.students.length < (group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup) && (
               <AddStudentModal
                 groupId={groupId}
                 groupTitle={group.title}
@@ -433,15 +599,13 @@ export default function GroupDetailPage() {
                         })()}
                       </div>
                     </div>
-                    {canModify && (
-                      <button
-                        onClick={() => handleRemoveStudent(studentId)}
-                        disabled={deletingStudentId === studentId}
-                        className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg text-muted-foreground transition-colors disabled:opacity-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleRemoveStudent(studentId)}
+                      disabled={deletingStudentId === studentId}
+                      className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg text-muted-foreground transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 );
               })}
@@ -450,21 +614,19 @@ export default function GroupDetailPage() {
             <div className="text-center py-12">
               <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">لا يوجد طلاب في هذه المجموعة بعد</p>
-              {canModify && (
-                <div className="mt-4">
-                  <AddStudentModal
-                    groupId={groupId}
-                    groupTitle={group.title}
-                    groupSubject={group.subject}
-                    groupStage={group.stage}
-                    groupGrade={group.grade}
-                    scheduleDays={group.scheduleDays || []}
-                    onStudentAdded={fetchGroup}
-                    maxStudents={group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}
-                    currentStudents={group.students.length}
-                  />
-                </div>
-              )}
+              <div className="mt-4">
+                <AddStudentModal
+                  groupId={groupId}
+                  groupTitle={group.title}
+                  groupSubject={group.subject}
+                  groupStage={group.stage}
+                  groupGrade={group.grade}
+                  scheduleDays={group.scheduleDays || []}
+                  onStudentAdded={fetchGroup}
+                  maxStudents={group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}
+                  currentStudents={group.students.length}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -518,6 +680,63 @@ export default function GroupDetailPage() {
           </ul>
         </div>
       </div>
+
+      {/* Delete Group Confirm Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              if (!isDeletingGroup) setShowDeleteConfirm(false);
+            }}
+          />
+          <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                <Trash2 className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold mb-1">حذف المجموعة</h3>
+              <p className="text-sm text-muted-foreground">
+                هل أنت متأكد من حذف مجموعة{" "}
+                <span className="font-semibold text-foreground">"{group?.title}"</span>؟
+              </p>
+              {(group?.students?.length || 0) > 0 && (
+                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+                  ⚠ هذه المجموعة بها {group!.students.length} طالب مسجل. حذفها سيزيل
+                  وصولهم إلى المجموعة والمشتريات المرتبطة بها، ولا يمكن التراجع عن هذا الإجراء.
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 p-6 pt-0">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeletingGroup}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleDeleteGroup}
+                disabled={isDeletingGroup}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeletingGroup ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    جاري الحذف...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 ml-2" />
+                    حذف نهائياً
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -558,6 +777,9 @@ function AddStudentModal({
     phone: "",
     stage: groupStage || "",
     grade: groupGrade,
+    parentName: "",
+    parentEmail: "",
+    parentPhone: "",
   });
 
   const searchStudents = useCallback(async () => {
@@ -632,16 +854,33 @@ function AddStudentModal({
         phone: formData.phone,
         stage: formData.stage || groupStage,
         grade: formData.grade || groupGrade,
+        parentName: formData.parentName,
+        parentEmail: formData.parentEmail,
+        parentPhone: formData.parentPhone,
       });
 
       const password = response.data.generatedPassword;
+      const parentPassword = response.data.parentGeneratedPassword;
+      const parentLinked = response.data.parentLinked;
+
       toast.success("تم إنشاء الحساب وإضافة الطالب بنجاح", {
-        description: password ? `كلمة المرور المؤقتة: ${password}` : undefined,
-        duration: 5000,
+        description: parentLinked
+          ? `كلمة مرور الطالب: ${password}${parentPassword ? ` — كلمة مرور ولي الأمر: ${parentPassword}` : " — تم ربط ولي الأمر بحساب قائم"}`
+          : `كلمة المرور المؤقتة: ${password}`,
+        duration: 7000,
       });
 
       setShowModal(false);
-      setFormData({ name: "", email: "", phone: "", stage: groupStage || "", grade: groupGrade });
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        stage: groupStage || "",
+        grade: groupGrade,
+        parentName: "",
+        parentEmail: "",
+        parentPhone: "",
+      });
       onStudentAdded();
     } catch (error) {
       const axiosError = error as { response?: { data?: { message?: string } } };
@@ -922,6 +1161,56 @@ function AddStudentModal({
                       {groupGrade || "غير محدد"}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">تُحدد تلقائياً حسب المجموعة</p>
+                  </div>
+
+                  {/* Parent info (optional) */}
+                  <div className="pt-2">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="flex-1 h-px bg-border" />
+                      <span className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+                        بيانات ولي الأمر
+                        <span className="px-2 py-0.5 bg-muted rounded text-xs font-medium">اختياري</span>
+                      </span>
+                      <span className="flex-1 h-px bg-border" />
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      إن أضفت بريد ولي الأمر سيتم إنشاء حساب له تلقائياً وربطه بالطالب، وإرسال بيانات الدخول ومعلومات المجموعة إلى بريده.
+                    </p>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">اسم ولي الأمر</label>
+                      <input
+                        type="text"
+                        value={formData.parentName}
+                        onChange={(e) => setFormData({ ...formData, parentName: e.target.value })}
+                        placeholder="الاسم الكامل (اختياري)"
+                        className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium mb-2">بريد ولي الأمر</label>
+                      <input
+                        type="email"
+                        value={formData.parentEmail}
+                        onChange={(e) => setFormData({ ...formData, parentEmail: e.target.value })}
+                        placeholder="parent@email.com"
+                        dir="ltr"
+                        className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium mb-2">هاتف ولي الأمر</label>
+                      <input
+                        type="tel"
+                        value={formData.parentPhone}
+                        onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
+                        placeholder="+20 1XX XXX XXXX"
+                        dir="ltr"
+                        className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
                   </div>
 
                   <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">

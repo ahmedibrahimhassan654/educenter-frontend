@@ -83,6 +83,8 @@ export interface Group {
   maxStudentsPerGroup: number;
   studentsCount?: number;
   googleMeetLink: string;
+  learningPoints?: string[];
+  descriptionVideo?: string;
   scheduleDays: string[];
   students: Array<string | { _id?: string; id?: string; name?: string; email?: string; phone?: string }>;
   createdAt: string;
@@ -137,6 +139,8 @@ export interface PublicGroup {
   totalSessionPrice: number;
   maxStudentsPerGroup: number;
   scheduleDays: string[];
+  learningPoints?: string[];
+  descriptionVideo?: string;
   studentsCount: number;
   createdAt?: string;
   teacher?: PublicTeacher | null;

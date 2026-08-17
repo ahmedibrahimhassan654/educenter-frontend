@@ -25,6 +25,7 @@ import {
   Settings,
   UserPlus,
   Compass,
+  Hourglass,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -42,6 +43,7 @@ const teacherLinks: SidebarLink[] = [
   { href: "/teacher", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
   { href: "/teacher/ai-tools", label: "الذكاء الاصطناعي", icon: Sparkles, color: "learning" },
   { href: "/teacher/groups", label: "المجموعات", icon: Users, color: "people" },
+  { href: "/teacher/groups/join-requests", label: "طلبات الانضمام", icon: Hourglass, color: "alert" },
   { href: "/teacher/earnings", label: "الأرباح", icon: Wallet, color: "money" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
   { href: "/teacher/profile", label: "الملف الشخصي", icon: UserCircle, color: "neutral" },

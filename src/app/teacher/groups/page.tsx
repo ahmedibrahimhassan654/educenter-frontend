@@ -23,6 +23,9 @@ import {
   Layers,
   GraduationCap,
   CheckCircle,
+  Upload,
+  PlayCircle,
+  Hourglass,
 } from "lucide-react";
 import { iconChip, iconColor } from "@/lib/icon-styles";
 
@@ -72,6 +75,8 @@ interface FormData {
   grade: string;
   stage: string;
   googleMeetLink: string;
+  learningPoints: string[];
+  descriptionVideo: string;
   scheduleSlots: ScheduleSlot[];
 }
 
@@ -81,6 +86,8 @@ const defaultFormData: FormData = {
   grade: "",
   stage: "",
   googleMeetLink: "",
+  learningPoints: [""],
+  descriptionVideo: "",
   scheduleSlots: [], // { day: string, time: string }
 };
 
@@ -99,6 +106,7 @@ export default function TeacherGroupsPage() {
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
   const [settings, setSettings] = useState<PlatformSettings>({
     defaultPricePerLecture: 50,
     maxStudentsPerGroup: 20,
@@ -106,6 +114,7 @@ export default function TeacherGroupsPage() {
   });
   const [teacherCurriculum, setTeacherCurriculum] = useState<string[]>([]);
   const [curriculumTree, setCurriculumTree] = useState<any[]>([]);
+  const [pendingRequestsByGroup, setPendingRequestsByGroup] = useState<Record<string, number>>({});
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -157,6 +166,21 @@ export default function TeacherGroupsPage() {
     }
   }, []);
 
+  const fetchPendingCounts = useCallback(async () => {
+    try {
+      const res = await api.get("/groups/join-requests");
+      const requests = res.data?.data || [];
+      const counts: Record<string, number> = {};
+      for (const r of requests) {
+        const gid = r.group?._id || r.group?.id || r.group;
+        if (gid) counts[gid] = (counts[gid] || 0) + 1;
+      }
+      setPendingRequestsByGroup(counts);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     fetchGroups(1);
     fetchSettings();
@@ -164,15 +188,20 @@ export default function TeacherGroupsPage() {
   }, [fetchGroups, fetchSettings, fetchTeacherCurriculum]);
 
   useEffect(() => {
+    fetchPendingCounts();
+  }, [fetchPendingCounts]);
+
+  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         fetchGroups();
         fetchSettings();
+        fetchPendingCounts();
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [fetchGroups, fetchSettings]);
+  }, [fetchGroups, fetchSettings, fetchPendingCounts]);
 
   // Build a map of subjectCode -> { stage, grade, subjectName } from curriculum tree
   const curriculumMap = new Map<string, { stage: string; grade: string; subject: string }>();
@@ -257,6 +286,8 @@ export default function TeacherGroupsPage() {
       grade: group.grade,
       stage: group.stage || getStageFromGrade(group.grade),
       googleMeetLink: group.googleMeetLink || "",
+      learningPoints: group.learningPoints && group.learningPoints.length > 0 ? group.learningPoints : [""],
+      descriptionVideo: group.descriptionVideo || "",
       scheduleSlots: slots,
     });
     setShowEditModal(true);
@@ -356,12 +387,14 @@ export default function TeacherGroupsPage() {
         (s) => `${s.day} ${s.time}`
       );
       if (editingGroup) {
-        await api.put(`/groups/${editingGroup.id}`, {
+        await api.put(`/groups/${editingGroup._id || editingGroup.id}`, {
           title: formData.title,
           subject: formData.subject,
           grade: formData.grade,
           stage: formData.stage,
           googleMeetLink: formData.googleMeetLink,
+          learningPoints: formData.learningPoints.filter((p) => p.trim() !== ""),
+          descriptionVideo: formData.descriptionVideo,
           scheduleDays,
         });
         toast.success("تم تحديث المجموعة بنجاح");
@@ -372,6 +405,8 @@ export default function TeacherGroupsPage() {
           grade: formData.grade,
           stage: formData.stage,
           googleMeetLink: formData.googleMeetLink,
+          learningPoints: formData.learningPoints.filter((p) => p.trim() !== ""),
+          descriptionVideo: formData.descriptionVideo,
           scheduleDays,
         });
         toast.success("تم إنشاء المجموعة بنجاح");
@@ -396,21 +431,15 @@ export default function TeacherGroupsPage() {
     }
   };
 
-  const handleDelete = async (groupId: string) => {
-    const group = groups.find((g) => g.id === groupId);
-    if (!group) return;
-
-    if ((group.studentsCount || 0) > 0) {
-      toast.error("لا يمكن حذف المجموعة لأن بها طلاب مسجلين");
-      return;
-    }
-
-    if (!confirm(`هل أنت متأكد من حذف مجموعة "${group.title}"؟`)) return;
+  const handleDelete = async (group: Group) => {
+    const groupId = group._id || group.id;
+    if (!groupId) return;
 
     setDeletingId(groupId);
     try {
       await api.delete(`/groups/${groupId}`);
       setGroups((prev) => prev.filter((g) => (g._id || g.id) !== groupId));
+      setDeleteTarget(null);
       toast.success("تم حذف المجموعة بنجاح");
     } catch (error: any) {
       const message = error.response?.data?.message || "فشل في حذف المجموعة";
@@ -418,10 +447,6 @@ export default function TeacherGroupsPage() {
     } finally {
       setDeletingId(null);
     }
-  };
-
-  const canModify = (group: Group): boolean => {
-    return (group.studentsCount || 0) === 0;
   };
 
   const platformFeeAmount = editingGroup
@@ -726,6 +751,8 @@ export default function TeacherGroupsPage() {
           const maxStudents = group.maxStudentsPerGroup || settings.maxStudentsPerGroup;
           const enrollmentPercent = Math.round(((group.studentsCount || 0) / maxStudents) * 100);
           const isFull = (group.studentsCount || 0) >= maxStudents;
+          const gid = (group._id || group.id) as string;
+          const pendingCount = gid ? pendingRequestsByGroup[gid] || 0 : 0;
 
           return (
             <div
@@ -743,21 +770,29 @@ export default function TeacherGroupsPage() {
                       <span>•</span>
                       <span>{group.grade}</span>
                     </div>
+                    {pendingCount > 0 && (
+                      <Link
+                        href={`/teacher/groups/${gid}`}
+                        className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-colors"
+                      >
+                        <Hourglass className="w-3.5 h-3.5" />
+                        طلبات انضمام ({pendingCount})
+                      </Link>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => openEditModal(group)}
-                      disabled={!canModify(group)}
-                      className="p-2 hover:bg-muted rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      title={canModify(group) ? "تعديل" : "لا يمكن التعديل"}
+                      className="p-2 hover:bg-muted rounded-lg transition-colors"
+                      title="تعديل"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete((group._id || group.id)!)}
-                      disabled={!canModify(group) || deletingId === (group._id || group.id)!}
+                      onClick={() => setDeleteTarget(group)}
+                      disabled={deletingId === (group._id || group.id)!}
                       className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed text-muted-foreground transition-colors"
-                      title={canModify(group) ? "حذف" : "لا يمكن الحذف"}
+                      title="حذف"
                     >
                       {deletingId === (group._id || group.id)! ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -817,6 +852,13 @@ export default function TeacherGroupsPage() {
                     </Badge>
                   )}
                 </div>
+
+                {(group.learningPoints || []).length > 0 && (
+                  <div className="flex items-start gap-1.5 mb-4 text-xs text-muted-foreground">
+                    <CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+                    <span className="line-clamp-1">{group.learningPoints![0]}</span>
+                  </div>
+                )}
 
                 <div className="mt-auto pt-4 border-t">
                   <Link
@@ -905,6 +947,63 @@ export default function TeacherGroupsPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {renderModalContent(formData, setFormData, settings, availableStages, availableGrades, availableSubjects, daysOfWeek, submitting, editingGroup, hasProfileCurriculum)}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              if (!deletingId) setDeleteTarget(null);
+            }}
+          />
+          <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                <Trash2 className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold mb-1">حذف المجموعة</h3>
+              <p className="text-sm text-muted-foreground">
+                هل أنت متأكد من حذف مجموعة{" "}
+                <span className="font-semibold text-foreground">"{deleteTarget.title}"</span>؟
+              </p>
+              {(deleteTarget.studentsCount || 0) > 0 && (
+                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+                  ⚠ هذه المجموعة بها {deleteTarget.studentsCount} طالب مسجل. حذفها سيزيل
+                  وصولهم إلى المجموعة والمشتريات المرتبطة بها، ولا يمكن التراجع عن هذا الإجراء.
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 p-6 pt-0">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeleteTarget(null)}
+                disabled={!!deletingId}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={() => handleDelete(deleteTarget)}
+                disabled={!!deletingId}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deletingId ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    جاري الحذف...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 ml-2" />
+                    حذف نهائياً
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -1063,6 +1162,131 @@ function renderModalContent(
           onChange={(e) => setFormData((prev) => ({ ...prev, googleMeetLink: e.target.value }))}
           placeholder="https://meet.google.com/xxx-xxxx-xxx"
         />
+      </div>
+
+      {/* Learning Points */}
+      <div>
+        <label className="block text-sm font-medium mb-2">ماذا ستتعلم في هذه المجموعة؟</label>
+        <p className="text-xs text-muted-foreground mb-3">أضف النقاط التعليمية التي سيغطيها الطالب</p>
+        <div className="space-y-2">
+          {formData.learningPoints.map((point, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
+                {index + 1}
+              </div>
+              <Input
+                type="text"
+                value={point}
+                onChange={(e) => {
+                  const updated = [...formData.learningPoints];
+                  updated[index] = e.target.value;
+                  setFormData((prev) => ({ ...prev, learningPoints: updated }));
+                }}
+                placeholder={`نقطة تعليمية ${index + 1} (مثال: أساسيات الجبر)`}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = formData.learningPoints.filter((_, i) => i !== index);
+                  setFormData((prev) => ({ ...prev, learningPoints: updated }));
+                }}
+                className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded text-muted-foreground shrink-0"
+                aria-label="حذف النقطة"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          {formData.learningPoints.length === 0 && (
+            <p className="text-xs text-muted-foreground">لم تتم إضافة أي نقاط بعد</p>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              setFormData((prev) => ({ ...prev, learningPoints: [...prev.learningPoints, ""] }))
+            }
+            className="flex items-center gap-2 text-sm text-primary hover:text-primary/80"
+          >
+            <Plus className="w-4 h-4" />
+            إضافة نقطة
+          </button>
+        </div>
+      </div>
+
+      {/* Description Video */}
+      <div>
+        <label className="block text-sm font-medium mb-2">فيديو وصف المجموعة (اختياري)</label>
+        <p className="text-xs text-muted-foreground mb-3">
+          ارفع فيديو قصير يعرّف الطلاب بالمجموعة (الحد الأقصى 100 ميجابايت)
+        </p>
+        {formData.descriptionVideo ? (
+          <div className="p-3 border rounded-lg bg-muted/20 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                <PlayCircle className="w-4 h-4 shrink-0 text-primary" />
+                <span className="truncate">فيديو تم رفعه بنجاح</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, descriptionVideo: "" }))}
+                className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded text-muted-foreground shrink-0"
+                aria-label="إزالة الفيديو"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <video src={formData.descriptionVideo} controls className="w-full rounded-lg max-h-48" />
+          </div>
+        ) : (
+          <label className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors">
+            <Upload className="w-6 h-6 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">اضغط لاختيار ملف فيديو</span>
+            <input
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 100 * 1024 * 1024) {
+                  toast.error("حجم الفيديو يجب أن يكون أقل من 100 ميجابايت");
+                  e.target.value = "";
+                  return;
+                }
+                const fd = new FormData();
+                fd.append("video", file);
+                const progressToast = toast.loading("جارٍ رفع الفيديو...", {
+                  duration: Infinity,
+                });
+                try {
+                  const res = await api.post("/groups/upload-video", fd, {
+                    timeout: 5 * 60 * 1000,
+                    onUploadProgress: (ev: any) => {
+                      if (ev.total) {
+                        const pct = Math.round((ev.loaded / ev.total) * 100);
+                        toast.loading(`جارٍ رفع الفيديو... ${pct}%`, {
+                          id: progressToast,
+                          duration: Infinity,
+                        });
+                      }
+                    },
+                  });
+                  toast.dismiss(progressToast);
+                  const url = res.data?.videoUrl;
+                  if (url) {
+                    setFormData((prev) => ({ ...prev, descriptionVideo: url }));
+                    toast.success("تم رفع الفيديو بنجاح");
+                  }
+                } catch (err: any) {
+                  toast.dismiss(progressToast);
+                  toast.error(err.response?.data?.message || "فشل رفع الفيديو");
+                } finally {
+                  e.target.value = "";
+                }
+              }}
+            />
+          </label>
+        )}
       </div>
 
       {/* Schedule - Day & Time */}

@@ -22,6 +22,7 @@ import {
   Layers,
   Compass,
   ShieldCheck,
+  CheckCircle2,
 } from "lucide-react";
 
 interface CurriculumSubject {
@@ -292,6 +293,13 @@ function ExploreCard({
                 {slot}
               </span>
             ))}
+          </div>
+        )}
+
+        {(group.learningPoints || []).length > 0 && (
+          <div className="flex items-start gap-1.5 mb-4 text-sm text-muted-foreground">
+            <CheckCircle2 className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+            <span className="line-clamp-1">{group.learningPoints![0]}</span>
           </div>
         )}
 

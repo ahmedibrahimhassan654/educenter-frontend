@@ -13,6 +13,7 @@ import {
   Clock,
   ArrowLeft,
   Layers,
+  CheckCircle2,
 } from "lucide-react";
 import { getSubjectColor } from "@/lib/subject-colors";
 
@@ -26,6 +27,7 @@ interface GroupItem {
   totalSessionPrice?: number;
   maxStudentsPerGroup?: number;
   scheduleDays?: string[];
+  learningPoints?: string[];
   studentsCount?: number;
   students?: any[];
   teacherId?: { name?: string };
@@ -57,6 +59,7 @@ export default function StudentMyGroupsPage() {
   const [gradeOptions, setGradeOptions] = useState<string[]>([]);
   const [selectedGrade, setSelectedGrade] = useState("");
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"mine" | "stage">("mine");
 
   const stage = (user as any)?.stage || "";
   const grade = (user as any)?.grade || "";
@@ -100,6 +103,39 @@ export default function StudentMyGroupsPage() {
     return stageGroups.filter((g) => g.grade === selectedGrade);
   }, [stageGroups, selectedGrade]);
 
+  const tabList: Array<{
+    id: "mine" | "stage";
+    label: string;
+    Icon: typeof Users;
+    count: number;
+    gradient: string;
+    badgeActive: string;
+    glow: string;
+  }> = [
+    {
+      id: "mine",
+      label: "مجموعاتي",
+      Icon: Users,
+      count: joinedGroups.length,
+      gradient: "from-blue-500 via-indigo-500 to-indigo-600",
+      badgeActive: "text-blue-700",
+      glow: "shadow-blue-500/40",
+    },
+  ];
+  if (stage) {
+    tabList.push({
+      id: "stage",
+      label: "مجموعات صفي ومرحلتي",
+      Icon: Layers,
+      count: filteredStageGroups.length,
+      gradient: "from-violet-500 via-purple-500 to-fuchsia-600",
+      badgeActive: "text-purple-700",
+      glow: "shadow-purple-500/40",
+    });
+  }
+  const activeIndex = Math.max(0, tabList.findIndex((t) => t.id === activeTab));
+  const activeTabConfig = tabList[activeIndex];
+
   const renderGroupCard = (group: GroupItem, target: "member" | "public" = "public") => {
     const id = groupId(group);
     const href = target === "member" ? `/student/my-groups/${id}` : `/groups/${id}`;
@@ -133,6 +169,12 @@ export default function StudentMyGroupsPage() {
             <Calendar className="w-4 h-4" />
             {getScheduleText(group.scheduleDays)}
           </div>
+          {(group.learningPoints || []).length > 0 && (
+            <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+              <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <span className="line-clamp-1">{group.learningPoints![0]}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between pt-3 border-t">
             <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Users className="w-4 h-4" />
@@ -159,7 +201,7 @@ export default function StudentMyGroupsPage() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <div>
         <h2 className="text-2xl md:text-3xl font-bold">مجموعاتي</h2>
         <p className="text-base text-muted-foreground mt-1">
@@ -167,73 +209,142 @@ export default function StudentMyGroupsPage() {
         </p>
       </div>
 
-      {/* Joined groups */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-primary" />
-          <h3 className="text-lg font-bold">المجموعات المنضمة إليها</h3>
-        </div>
-        {joinedGroups.length === 0 ? (
-          <div className="bg-card border rounded-xl p-10 text-center">
-            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-            <p className="font-medium">لم تنضم إلى أي مجموعة بعد</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              استكشف المجموعات المتاحة لمرحلتك وانضم إليها
-            </p>
-            <Link
-              href="/groups"
-              className="inline-flex items-center gap-2 mt-4 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
-            >
-              استكشف المجموعات
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {joinedGroups.map((g) => renderGroupCard(g, "member"))}
-          </div>
-        )}
-      </section>
-
-      {/* Stage/grade groups */}
-      {stage && (
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold">مجموعات صفي ومرحلتي</h3>
+      {/* Animated tab bar */}
+      <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+        <div className="relative grid rounded-2xl border bg-background/70 backdrop-blur p-1.5 shadow-sm">
+          {/* Sliding indicator */}
+          <div
+            className="absolute top-1.5 bottom-1.5 rounded-xl transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            style={{
+              insetInlineStart: `calc(${activeIndex * (100 / tabList.length)}% + 0.375rem)`,
+              insetInlineEnd: `calc(${(tabList.length - 1 - activeIndex) * (100 / tabList.length)}% + 0.375rem)`,
+            }}
+          >
+            <div
+              className={`absolute inset-0 rounded-xl bg-gradient-to-l shadow-lg ${activeTabConfig.gradient} ${activeTabConfig.glow}`}
+            />
           </div>
 
-          {gradeOptions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {gradeOptions.map((g) => (
+          {/* Tabs */}
+          <div
+            className="relative grid"
+            style={{ gridTemplateColumns: `repeat(${tabList.length}, 1fr)` }}
+            role="tablist"
+          >
+            {tabList.map(({ id, label, Icon, count, badgeActive }) => {
+              const active = activeTab === id;
+              return (
                 <button
-                  key={g}
-                  onClick={() => setSelectedGrade(g)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedGrade === g
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-background border hover:bg-muted"
-                  }`}
+                  key={id}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setActiveTab(id)}
+                  className={`relative z-10 flex items-center justify-center gap-2.5 py-3 px-3 md:px-5 rounded-xl transition-all duration-300 group ${
+                    active ? "text-white scale-[1.02]" : "text-muted-foreground hover:text-foreground"
+                  } ${active ? "cursor-default" : "hover:bg-muted/60 active:scale-[0.98]"}`}
                 >
-                  {g}
-                </button>
-              ))}
-            </div>
-          )}
+                  {/* Icon chip */}
+                  <span
+                    className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-all duration-300 ${
+                      active ? "bg-white/20 scale-110" : "bg-muted group-hover:bg-muted-foreground/10"
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 transition-all duration-300 ${active ? "text-white drop-shadow" : "text-muted-foreground group-hover:text-foreground"}`} />
+                  </span>
 
-          {filteredStageGroups.length === 0 ? (
-            <div className="bg-card border rounded-xl p-10 text-center">
-              <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="font-medium">لا توجد مجموعات متاحة لهذا الصف حالياً</p>
-              <p className="text-sm text-muted-foreground mt-1">ترقّب إضافة مجموعات جديدة</p>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredStageGroups.map((g) => renderGroupCard(g))}
-            </div>
-          )}
-        </section>
-      )}
+                  {/* Title */}
+                  <span className="font-bold text-sm md:text-base whitespace-nowrap">{label}</span>
+
+                  {/* Count badge */}
+                  <span
+                    className={`relative inline-flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full text-xs font-bold transition-all duration-300 ${
+                      active
+                        ? `bg-white ${badgeActive} scale-110`
+                        : "bg-muted-foreground/10 text-muted-foreground group-hover:bg-muted-foreground/20"
+                    }`}
+                  >
+                    <span key={count} className="animate-in zoom-in duration-300">
+                      {count}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Active tab content */}
+      <div key={activeTab} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+        {activeTab === "mine" && (
+          <>
+            {joinedGroups.length === 0 ? (
+              <div className="bg-card border rounded-xl p-10 text-center">
+                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <p className="font-medium">لم تنضم إلى أي مجموعة بعد</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  استكشف المجموعات المتاحة لمرحلتك وانضم إليها
+                </p>
+                {stage ? (
+                  <button
+                    onClick={() => setActiveTab("stage")}
+                    className="inline-flex items-center gap-2 mt-4 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
+                  >
+                    تصفح مجموعات صفي ومرحلتي
+                    <Layers className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <Link
+                    href="/groups"
+                    className="inline-flex items-center gap-2 mt-4 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
+                  >
+                    استكشف المجموعات
+                    <ArrowLeft className="w-4 h-4" />
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {joinedGroups.map((g) => renderGroupCard(g, "member"))}
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === "stage" && stage && (
+          <>
+            {gradeOptions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {gradeOptions.map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setSelectedGrade(g)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      selectedGrade === g
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background border hover:bg-muted"
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {filteredStageGroups.length === 0 ? (
+              <div className="bg-card border rounded-xl p-10 text-center">
+                <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <p className="font-medium">لا توجد مجموعات متاحة لهذا الصف حالياً</p>
+                <p className="text-sm text-muted-foreground mt-1">ترقّب إضافة مجموعات جديدة</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredStageGroups.map((g) => renderGroupCard(g))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
