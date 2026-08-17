@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import api from "@/lib/api";
+import api, { clearCache } from "@/lib/api";
 import { Group } from "@/types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import UserAvatar from "@/components/user-avatar";
 import {
   ArrowLeft,
   Users,
@@ -23,10 +24,17 @@ import {
   Phone,
   GraduationCap,
   Send,
-  CheckCircle,
   Check,
   Hourglass,
   PlayCircle,
+  Info,
+  BookOpen,
+  Video,
+  Radio,
+  FileText,
+  Link2,
+  Upload,
+  Plus,
 } from "lucide-react";
 
 interface SuggestedStudent {
@@ -58,6 +66,64 @@ interface JoinRequestRecord {
   createdAt: string;
 }
 
+interface LessonItem {
+  _id: string;
+  id?: string;
+  title: string;
+  description?: string;
+  type: "LIVE" | "RECORDED" | "DOCUMENT" | "LINK";
+  meetingLink?: string;
+  videoUrl?: string;
+  documentUrl?: string;
+  referenceUrl?: string;
+  scheduleDay?: string;
+  scheduleTime?: string;
+  scheduledAt?: string;
+  createdAt: string;
+}
+
+type LessonType = "LIVE" | "RECORDED" | "DOCUMENT" | "LINK";
+
+const LESSON_TYPE_META: Record<
+  LessonType,
+  {
+    label: string;
+    Icon: React.ComponentType<{ className?: string }>;
+    color: string;
+    bg: string;
+    badge: string;
+  }
+> = {
+  LIVE: {
+    label: "درس مباشر",
+    Icon: Video,
+    color: "text-rose-500",
+    bg: "bg-rose-500/10",
+    badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  },
+  RECORDED: {
+    label: "فيديو مسجل",
+    Icon: Radio,
+    color: "text-blue-500",
+    bg: "bg-blue-500/10",
+    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  },
+  DOCUMENT: {
+    label: "مستند",
+    Icon: FileText,
+    color: "text-amber-500",
+    bg: "bg-amber-500/10",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+  LINK: {
+    label: "رابط مرجعي",
+    Icon: Link2,
+    color: "text-emerald-500",
+    bg: "bg-emerald-500/10",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+};
+
 export default function GroupDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -76,12 +142,16 @@ export default function GroupDetailPage() {
   const [groupPurchases, setGroupPurchases] = useState<PurchaseRecord[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequestRecord[]>([]);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"info" | "students" | "lessons">("info");
+  const [lessons, setLessons] = useState<LessonItem[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(false);
 
   const groupId = params.groupId as string;
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
     try {
+      clearCache(`/groups/${groupId}`);
       const response = await api.get(`/groups/${groupId}`);
       setGroup(response.data);
     } catch (error) {
@@ -90,6 +160,20 @@ export default function GroupDetailPage() {
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  }, [groupId]);
+
+  const fetchLessons = useCallback(async () => {
+    if (!groupId) return;
+    setLessonsLoading(true);
+    try {
+      clearCache(`/groups/${groupId}/lessons`);
+      const res = await api.get(`/groups/${groupId}/lessons`);
+      setLessons(res.data?.data || []);
+    } catch {
+      // ignore
+    } finally {
+      setLessonsLoading(false);
     }
   }, [groupId]);
 
@@ -104,6 +188,7 @@ export default function GroupDetailPage() {
         .get(`/groups/${groupId}/join-requests`)
         .then((res) => setJoinRequests(res.data?.data || []))
         .catch(() => {});
+      fetchLessons();
     }
     const fetchCurriculum = async () => {
       try {
@@ -125,7 +210,7 @@ export default function GroupDetailPage() {
       }
     };
     fetchSettings();
-  }, [groupId, fetchGroup]);
+  }, [groupId, fetchGroup, fetchLessons]);
 
   const curriculumMap = new Map<string, { stage: string; grade: string; subject: string }>();
   for (const stage of curriculumTree) {
@@ -220,6 +305,18 @@ export default function GroupDetailPage() {
     }
   };
 
+  const handleDeleteLesson = async (lessonId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا الدرس؟")) return;
+    try {
+      await api.delete(`/groups/${groupId}/lessons/${lessonId}`);
+      toast.success("تم حذف الدرس بنجاح");
+      setLessons((prev) => prev.filter((l) => l._id !== lessonId));
+    } catch (error) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || "فشل في حذف الدرس");
+    }
+  };
+
   const purchasesByStudent = useMemo(() => {
     const map: Record<string, PurchaseRecord[]> = {};
     for (const p of groupPurchases) {
@@ -272,6 +369,43 @@ export default function GroupDetailPage() {
     );
   }
 
+  const tabList: Array<{
+    id: "info" | "students" | "lessons";
+    label: string;
+    Icon: typeof Info;
+    count?: number;
+    gradient: string;
+    badgeActive: string;
+    glow: string;
+  }> = [
+    {
+      id: "info",
+      label: "معلومات المجموعة",
+      Icon: Info,
+      gradient: "from-blue-500 via-indigo-500 to-indigo-600",
+      badgeActive: "text-blue-700",
+      glow: "shadow-blue-500/40",
+    },
+    {
+      id: "students",
+      label: "الطلاب",
+      Icon: Users,
+      count: group.students.length,
+      gradient: "from-emerald-500 via-teal-500 to-teal-600",
+      badgeActive: "text-emerald-700",
+      glow: "shadow-emerald-500/40",
+    },
+    {
+      id: "lessons",
+      label: "الدروس",
+      Icon: BookOpen,
+      gradient: "from-violet-500 via-purple-500 to-fuchsia-600",
+      badgeActive: "text-purple-700",
+      glow: "shadow-purple-500/40",
+    },
+  ];
+  const activeIndex = Math.max(0, tabList.findIndex((t) => t.id === activeTab));
+
   return (
     <>
       <div className="space-y-8">
@@ -316,17 +450,6 @@ export default function GroupDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <AddStudentModal
-              groupId={groupId}
-              groupTitle={group.title}
-              groupSubject={group.subject}
-              groupStage={group.stage}
-              groupGrade={group.grade}
-              scheduleDays={group.scheduleDays || []}
-              onStudentAdded={fetchGroup}
-              maxStudents={group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}
-              currentStudents={group.students.length}
-            />
             <Button
               variant="outline"
               onClick={() => setShowDeleteConfirm(true)}
@@ -338,6 +461,69 @@ export default function GroupDetailPage() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+          <div className="relative grid rounded-2xl border bg-background/70 backdrop-blur p-1.5 shadow-sm">
+            {/* Sliding indicator */}
+            <div
+              className="absolute top-1.5 bottom-1.5 rounded-xl transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              style={{
+                insetInlineStart: `calc(${activeIndex * (100 / tabList.length)}% + 0.375rem)`,
+                insetInlineEnd: `calc(${(tabList.length - 1 - activeIndex) * (100 / tabList.length)}% + 0.375rem)`,
+              }}
+            >
+              <div
+                className={`absolute inset-0 rounded-xl bg-gradient-to-l shadow-lg ${tabList[activeIndex].gradient} ${tabList[activeIndex].glow}`}
+              />
+            </div>
+
+            {/* Tabs */}
+            <div
+              className="relative grid"
+              style={{ gridTemplateColumns: `repeat(${tabList.length}, 1fr)` }}
+              role="tablist"
+            >
+              {tabList.map(({ id, label, Icon, count, badgeActive }) => {
+                const active = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setActiveTab(id)}
+                    className={`relative z-10 flex items-center justify-center gap-2.5 py-3 px-3 md:px-5 rounded-xl transition-all duration-300 group ${
+                      active ? "text-white scale-[1.02]" : "text-muted-foreground hover:text-foreground"
+                    } ${active ? "cursor-default" : "hover:bg-muted/60 active:scale-[0.98]"}`}
+                  >
+                    <span
+                      className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-all duration-300 ${
+                        active ? "bg-white/20 scale-110" : "bg-muted group-hover:bg-muted-foreground/10"
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 transition-all duration-300 ${active ? "text-white drop-shadow" : "text-muted-foreground group-hover:text-foreground"}`} />
+                    </span>
+                    <span className="font-bold text-sm md:text-base whitespace-nowrap">{label}</span>
+                    {typeof count === "number" && (
+                      <span
+                        className={`relative inline-flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full text-xs font-bold transition-all duration-300 ${
+                          active
+                            ? `bg-white ${badgeActive} scale-110`
+                            : "bg-muted-foreground/10 text-muted-foreground group-hover:bg-muted-foreground/20"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Tab content */}
+        {activeTab === "info" && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-300">
         {/* Group Info Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-card border rounded-xl p-6">
@@ -406,80 +592,6 @@ export default function GroupDetailPage() {
           </div>
         </div>
 
-        {/* Join requests */}
-        {joinRequests.length > 0 && (
-          <div className="bg-card border border-amber-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2">
-                <span className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                  <Hourglass className="w-5 h-5 text-amber-500" />
-                </span>
-                طلبات الانضمام ({joinRequests.length})
-              </h3>
-            </div>
-            <div className="space-y-3">
-              {joinRequests.map((req) => {
-                const student = typeof req.student === "object" ? req.student : null;
-                const name = student?.name || "طالب";
-                return (
-                  <div
-                    key={req.id}
-                    className="flex flex-wrap items-center gap-4 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20"
-                  >
-                    <div className="w-11 h-11 rounded-full bg-amber-500/15 flex items-center justify-center text-lg font-bold text-amber-600 dark:text-amber-400">
-                      {name.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold">{name}</p>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground mt-0.5">
-                        {student?.email && (
-                          <span className="flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5" />
-                            {student.email}
-                          </span>
-                        )}
-                        {student?.phone && (
-                          <span className="flex items-center gap-1.5">
-                            <Phone className="w-3.5 h-3.5" />
-                            {student.phone}
-                          </span>
-                        )}
-                        {student?.grade && <span>الصف: {student.grade}</span>}
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(req.createdAt).toLocaleDateString("ar-EG")}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => handleJoinRequest(req.id, "accept")}
-                        disabled={processingRequestId === req.id}
-                        className="gap-2"
-                      >
-                        {processingRequestId === req.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Check className="w-4 h-4" />
-                        )}
-                        قبول
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => handleJoinRequest(req.id, "reject")}
-                        disabled={processingRequestId === req.id}
-                        className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-500/10 border-red-500/30"
-                      >
-                        <X className="w-4 h-4" />
-                        رفض
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Schedule */}
         <div className="bg-card border rounded-xl p-6">
           <h3 className="text-lg font-bold mb-4">مواعيد الحصص الأسبوعية</h3>
@@ -532,105 +644,6 @@ export default function GroupDetailPage() {
           </div>
         )}
 
-        {/* Students List */}
-        <div className="bg-card border rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold">قائمة الطلاب ({group.students.length})</h3>
-            {group.students.length < (group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup) && (
-              <AddStudentModal
-                groupId={groupId}
-                groupTitle={group.title}
-                groupSubject={group.subject}
-                groupStage={group.stage}
-                groupGrade={group.grade}
-                scheduleDays={group.scheduleDays || []}
-                onStudentAdded={fetchGroup}
-                maxStudents={group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}
-                currentStudents={group.students.length}
-              />
-            )}
-          </div>
-
-          {(group.students || []).length > 0 ? (
-            <div className="space-y-3">
-              {(group.students as Array<string | { _id?: string; id?: string; name?: string; email?: string; phone?: string }>).map((student) => {
-                const studentObj = typeof student === "string" ? null : student;
-                const studentId = typeof student === "string" ? student : (student._id || student.id || "");
-                const studentName = studentObj?.name || "طالب";
-                const studentEmail = studentObj?.email || "لا يوجد بريد";
-                return (
-                  <div
-                    key={studentId}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-bold text-primary">
-                          {studentName.charAt(0)}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium">{studentName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {studentEmail}
-                        </p>
-                        {(() => {
-                          const ent = entitlementFor(studentId);
-                          if (ent.monthlyUntil) {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-                                اشتراك شهري حتى{" "}
-                                {new Date(ent.monthlyUntil).toLocaleDateString("ar-EG")}
-                              </span>
-                            );
-                          }
-                          if (ent.credits > 0) {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-medium">
-                                {ent.credits} حصة متبقية
-                              </span>
-                            );
-                          }
-                          return (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
-                              لم يشترِ حصصاً
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleRemoveStudent(studentId)}
-                      disabled={deletingStudentId === studentId}
-                      className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg text-muted-foreground transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">لا يوجد طلاب في هذه المجموعة بعد</p>
-              <div className="mt-4">
-                <AddStudentModal
-                  groupId={groupId}
-                  groupTitle={group.title}
-                  groupSubject={group.subject}
-                  groupStage={group.stage}
-                  groupGrade={group.grade}
-                  scheduleDays={group.scheduleDays || []}
-                  onStudentAdded={fetchGroup}
-                  maxStudents={group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}
-                  currentStudents={group.students.length}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Google Meet Link */}
         {group.googleMeetLink && (
           <div className="bg-card border rounded-xl p-6">
@@ -647,38 +660,274 @@ export default function GroupDetailPage() {
           </div>
         )}
 
-        {/* Empty placeholder for future customization */}
-        <div className="bg-card border rounded-xl p-8 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full bg-muted/50 flex items-center justify-center mb-4">
-            <Settings className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-xl font-bold mb-2">قيد التطوير</h3>
-          <p className="text-muted-foreground mb-6">
-            ستتم إضافة المزيد من الميزات لهذه الصفحة لاحقاً مثل:
-          </p>
-          <ul className="text-right text-muted-foreground space-y-2 max-w-md mx-auto">
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-primary"></span>
-              إدارة الحضور والغياب
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-primary"></span>
-              جدولة الحصص والتقويم
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-primary"></span>
-              رفع الملفات والمواد التعليمية
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-primary"></span>
-              التقارير والإحصائيات
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-primary"></span>
-              التواصل مع الطلاب
-            </li>
-          </ul>
         </div>
+        )}
+
+        {/* Students tab */}
+        {activeTab === "students" && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-300">
+          {/* Join requests */}
+          {joinRequests.length > 0 && (
+            <div className="bg-card border border-amber-500/30 rounded-xl p-6">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <span className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Hourglass className="w-5 h-5 text-amber-500" />
+                  </span>
+                  طلبات الانضمام ({joinRequests.length})
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {joinRequests.map((req) => {
+                  const student = typeof req.student === "object" ? req.student : null;
+                  const name = student?.name || "طالب";
+                  return (
+                    <div
+                      key={req.id}
+                      className="flex flex-wrap items-center gap-4 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20"
+                    >
+                      <UserAvatar name={name} avatarUrl={student?.avatarUrl} className="w-11 h-11 text-lg" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold">{name}</p>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground mt-0.5">
+                          {student?.email && (
+                            <span className="flex items-center gap-1.5">
+                              <Mail className="w-3.5 h-3.5" />
+                              {student.email}
+                            </span>
+                          )}
+                          {student?.phone && (
+                            <span className="flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5" />
+                              {student.phone}
+                            </span>
+                          )}
+                          {student?.grade && <span>الصف: {student.grade}</span>}
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(req.createdAt).toLocaleDateString("ar-EG")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => handleJoinRequest(req.id, "accept")}
+                          disabled={processingRequestId === req.id}
+                          className="gap-2"
+                        >
+                          {processingRequestId === req.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Check className="w-4 h-4" />
+                          )}
+                          قبول
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleJoinRequest(req.id, "reject")}
+                          disabled={processingRequestId === req.id}
+                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-500/10 border-red-500/30"
+                        >
+                          <X className="w-4 h-4" />
+                          رفض
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Students List */}
+          <div className="bg-card border rounded-xl p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-bold">قائمة الطلاب ({group.students.length})</h3>
+              <AddStudentModal
+                groupId={groupId}
+                groupTitle={group.title}
+                groupSubject={group.subject}
+                groupStage={group.stage}
+                groupGrade={group.grade}
+                scheduleDays={group.scheduleDays || []}
+                onStudentAdded={fetchGroup}
+                maxStudents={group.maxStudentsPerGroup || platformSettings.maxStudentsPerGroup}
+                currentStudents={group.students.length}
+              />
+            </div>
+
+            {(group.students || []).length > 0 ? (
+              <div className="space-y-3">
+                {(group.students as Array<string | { _id?: string; id?: string; name?: string; email?: string; phone?: string; avatarUrl?: string }>).map((student) => {
+                  const studentObj = typeof student === "string" ? null : student;
+                  const studentId = typeof student === "string" ? student : (student._id || student.id || "");
+                  const studentName = studentObj?.name || "طالب";
+                  const studentEmail = studentObj?.email || "لا يوجد بريد";
+                  return (
+                    <div
+                      key={studentId}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <UserAvatar name={studentName} avatarUrl={studentObj?.avatarUrl} className="w-10 h-10 text-base" />
+                        <div>
+                          <p className="font-medium">{studentName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {studentEmail}
+                          </p>
+                          {(() => {
+                            const ent = entitlementFor(studentId);
+                            if (ent.monthlyUntil) {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                                  اشتراك شهري حتى{" "}
+                                  {new Date(ent.monthlyUntil).toLocaleDateString("ar-EG")}
+                                </span>
+                              );
+                            }
+                            if (ent.credits > 0) {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-medium">
+                                  {ent.credits} حصة متبقية
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
+                                لم يشترِ حصصاً
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveStudent(studentId)}
+                        disabled={deletingStudentId === studentId}
+                        className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg text-muted-foreground transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">لا يوجد طلاب في هذه المجموعة بعد</p>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
+
+        {/* Lessons tab */}
+        {activeTab === "lessons" && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-bold">الدروس</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                أضف دروساً مباشرة، فيديوهات مسجلة، مستندات، أو روابط مرجعية لطلابك
+              </p>
+            </div>
+            <AddLessonModal groupId={groupId} scheduleDays={group.scheduleDays || []} defaultMeetingLink={group.googleMeetLink || ""} onLessonAdded={fetchLessons} />
+          </div>
+
+          {lessonsLoading ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : lessons.length === 0 ? (
+            <div className="bg-card border rounded-xl p-12 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-violet-500/10 flex items-center justify-center mb-4">
+                <BookOpen className="w-8 h-8 text-violet-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">لا توجد دروس بعد</h3>
+              <p className="text-muted-foreground">
+                أضف أول درس لك الآن - بث مباشر، فيديو مسجل، مستند، أو رابط مرجعي
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {lessons.map((lesson) => {
+                const meta = LESSON_TYPE_META[lesson.type];
+                const href =
+                  lesson.type === "LIVE"
+                    ? lesson.meetingLink
+                    : lesson.type === "RECORDED"
+                    ? lesson.videoUrl
+                    : lesson.type === "DOCUMENT"
+                    ? lesson.documentUrl
+                    : lesson.referenceUrl;
+                const actionLabel =
+                  lesson.type === "LIVE"
+                    ? "انضمام للبث المباشر"
+                    : lesson.type === "RECORDED"
+                    ? "مشاهدة الفيديو"
+                    : lesson.type === "DOCUMENT"
+                    ? "تحميل المستند"
+                    : "فتح الرابط المرجعي";
+                return (
+                  <div
+                    key={lesson._id}
+                    className="bg-card border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+                  >
+                    <div className={`w-12 h-12 rounded-xl ${meta.bg} flex items-center justify-center shrink-0`}>
+                      <meta.Icon className={`w-6 h-6 ${meta.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-lg font-bold truncate">{lesson.title}</h4>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}>
+                          {meta.label}
+                        </span>
+                      </div>
+                      {lesson.description && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{lesson.description}</p>
+                      )}
+                      {lesson.type === "LIVE" && lesson.scheduledAt ? (
+                        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-primary">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(lesson.scheduledAt).toLocaleDateString("ar-EG", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                          })}
+                          <span className="text-muted-foreground">•</span>
+                          {lesson.scheduleTime}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          {new Date(lesson.createdAt).toLocaleDateString("ar-EG")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {href && (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                        >
+                          <meta.Icon className="w-4 h-4" />
+                          {actionLabel}
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleDeleteLesson(lesson._id)}
+                        className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg text-muted-foreground transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        )}
       </div>
 
       {/* Delete Group Confirm Modal */}
@@ -1003,11 +1252,7 @@ function AddStudentModal({
                           className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-sm font-bold text-primary">
-                                {student.name.charAt(0)}
-                              </span>
-                            </div>
+                            <UserAvatar name={student.name} avatarUrl={student.avatarUrl} className="w-10 h-10 text-base" />
                             <div>
                               <p className="font-medium">{student.name}</p>
                               <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -1071,11 +1316,7 @@ function AddStudentModal({
                           className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-sm font-bold text-primary">
-                                {student.name.charAt(0)}
-                              </span>
-                            </div>
+                            <UserAvatar name={student.name} avatarUrl={student.avatarUrl} className="w-10 h-10 text-base" />
                             <div>
                               <p className="font-medium">{student.name}</p>
                               <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -1234,6 +1475,443 @@ function AddStudentModal({
                 </form>
               )}
             </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function AddLessonModal({
+  groupId,
+  scheduleDays,
+  defaultMeetingLink,
+  onLessonAdded,
+}: {
+  groupId: string;
+  scheduleDays: string[];
+  defaultMeetingLink?: string;
+  onLessonAdded: () => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [type, setType] = useState<LessonType>("LIVE");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [meetingLink, setMeetingLink] = useState("");
+  const [meetingLinkMode, setMeetingLinkMode] = useState<"group" | "custom">(
+    defaultMeetingLink ? "group" : "custom"
+  );
+  const [scheduleSlot, setScheduleSlot] = useState(scheduleDays[0] || "");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [documentUrl, setDocumentUrl] = useState("");
+  const [referenceUrl, setReferenceUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const reset = () => {
+    setTitle("");
+    setDescription("");
+    setMeetingLink("");
+    setMeetingLinkMode(defaultMeetingLink ? "group" : "custom");
+    setScheduleSlot(scheduleDays[0] || "");
+    setVideoUrl("");
+    setDocumentUrl("");
+    setReferenceUrl("");
+    setType("LIVE");
+  };
+
+  const nextDateFor = (slot: string): string => {
+    const day = slot.replace(/\s+\d+:\d+.*$/, "");
+    const timeMatch = slot.match(/(\d{1,2}):(\d{2})/);
+    if (!day || !timeMatch) return "";
+    const dayMap: Record<string, number> = {
+      الأحد: 0,
+      الاثنين: 1,
+      الثلاثاء: 2,
+      الأربعاء: 3,
+      الخميس: 4,
+      الجمعة: 5,
+      السبت: 6,
+    };
+    const target = dayMap[day];
+    if (target === undefined) return "";
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+    let diff = (target - next.getDay() + 7) % 7;
+    next.setDate(next.getDate() + diff);
+    if (next.getTime() < now.getTime()) {
+      next.setDate(next.getDate() + 7);
+    }
+    return next.toLocaleDateString("ar-EG", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+  };
+
+  const scheduledDate = type === "LIVE" ? nextDateFor(scheduleSlot) : "";
+
+  const uploadAttachment = async (file: File) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post(`/groups/${groupId}/lessons/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data.url as string;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await uploadAttachment(file);
+      if (type === "RECORDED") setVideoUrl(url);
+      else if (type === "DOCUMENT") setDocumentUrl(url);
+      toast.success("تم رفع الملف بنجاح");
+    } catch (error) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || "فشل في رفع الملف");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const liveSlot = scheduleSlot.match(/^(.+?)\s+(\d{1,2}:\d{2})/);
+      const liveMeetingLink =
+        type === "LIVE" && meetingLinkMode === "group"
+          ? defaultMeetingLink || ""
+          : meetingLink;
+      await api.post(`/groups/${groupId}/lessons`, {
+        title,
+        description,
+        type,
+        meetingLink: type === "LIVE" ? liveMeetingLink : undefined,
+        scheduleDay: type === "LIVE" && liveSlot ? liveSlot[1] : undefined,
+        scheduleTime: type === "LIVE" && liveSlot ? liveSlot[2] : undefined,
+        videoUrl: type === "RECORDED" ? videoUrl : undefined,
+        documentUrl: type === "DOCUMENT" ? documentUrl : undefined,
+        referenceUrl: type === "LINK" ? referenceUrl : undefined,
+      });
+      toast.success("تمت إضافة الدرس بنجاح");
+      setShowModal(false);
+      reset();
+      onLessonAdded();
+    } catch (error) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || "فشل في إضافة الدرس");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setShowModal(true)}
+        className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+        إضافة درس
+      </button>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowModal(false)}
+          />
+          <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-background p-6 border-b z-10">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold">إضافة درس جديد</h3>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                {(Object.keys(LESSON_TYPE_META) as LessonType[]).map((t) => {
+                  const meta = LESSON_TYPE_META[t];
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setType(t)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-right ${
+                        type === t
+                          ? "bg-primary/10 border border-primary/40 text-primary"
+                          : "bg-muted hover:bg-muted/80 border border-transparent"
+                      }`}
+                    >
+                      <meta.Icon className="w-4 h-4 shrink-0" />
+                      {meta.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">عنوان الدرس</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="مثال: حل تمارين الوحدة الأولى"
+                  required
+                  className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">الوصف (اختياري)</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="نبذة مختصرة عن الدرس..."
+                  rows={2}
+                  className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {type === "LIVE" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">يوم ووقت الحصة (من جدول المجموعة)</label>
+                    {scheduleDays.length > 0 ? (
+                      <>
+                        <select
+                          value={scheduleSlot}
+                          onChange={(e) => setScheduleSlot(e.target.value)}
+                          required
+                          className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          {scheduleDays.map((slot) => (
+                            <option key={slot} value={slot}>
+                              {slot}
+                            </option>
+                          ))}
+                        </select>
+                        {scheduledDate && (
+                          <div className="mt-3 p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm">
+                            <span className="font-semibold text-primary">الموعد التلقائي:</span>{" "}
+                            <span className="font-bold">{scheduledDate}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400">
+                        لا توجد مواعيد محددة لجدول المجموعة. أضف مواعيد الحصص أولاً من معلومات المجموعة.
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">رابط الاجتماع المباشر</label>
+                    {defaultMeetingLink ? (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => setMeetingLinkMode("group")}
+                          className={`w-full flex items-start gap-3 p-3 rounded-lg border text-right transition-colors ${
+                            meetingLinkMode === "group"
+                              ? "bg-primary/10 border-primary/40"
+                              : "bg-muted/50 border-border hover:bg-muted/80"
+                          }`}
+                        >
+                          <span
+                            className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              meetingLinkMode === "group" ? "border-primary" : "border-muted-foreground"
+                            }`}
+                          >
+                            {meetingLinkMode === "group" && <span className="w-2 h-2 rounded-full bg-primary" />}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">استخدام رابط المجموعة</span>
+                            <span className="block text-xs text-muted-foreground truncate mt-0.5" dir="ltr">
+                              {defaultMeetingLink}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMeetingLinkMode("custom")}
+                          className={`w-full flex items-start gap-3 p-3 rounded-lg border text-right transition-colors ${
+                            meetingLinkMode === "custom"
+                              ? "bg-primary/10 border-primary/40"
+                              : "bg-muted/50 border-border hover:bg-muted/80"
+                          }`}
+                        >
+                          <span
+                            className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              meetingLinkMode === "custom" ? "border-primary" : "border-muted-foreground"
+                            }`}
+                          >
+                            {meetingLinkMode === "custom" && <span className="w-2 h-2 rounded-full bg-primary" />}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">إضافة رابط اجتماع جديد</span>
+                          </span>
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        لم يتم تحديد رابط اجتماع للمجموعة، أدخل رابطاً جديداً للحصة:
+                      </p>
+                    )}
+
+                    {meetingLinkMode === "custom" && (
+                      <input
+                        type="url"
+                        value={meetingLink}
+                        onChange={(e) => setMeetingLink(e.target.value)}
+                        placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                        required
+                        dir="ltr"
+                        className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    )}
+                    {meetingLinkMode === "group" && defaultMeetingLink && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        سيستخدم الطلاب رابط المجموعة للانضمام للبث المباشر
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {type === "RECORDED" && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">فيديو الحصة المسجل</label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-background border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                    >
+                      {uploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      رفع فيديو
+                    </button>
+                    {videoUrl && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-medium">
+                        <Check className="w-3.5 h-3.5" />
+                        تم رفع الفيديو
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="url"
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    placeholder="أو الصق رابط الفيديو هنا"
+                    dir="ltr"
+                    className="w-full px-4 py-3 mt-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              )}
+
+              {type === "DOCUMENT" && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">ملف المستند</label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.png,.jpg,.jpeg"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-background border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                    >
+                      {uploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      رفع مستند
+                    </button>
+                    {documentUrl && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-medium">
+                        <Check className="w-3.5 h-3.5" />
+                        تم رفع المستند
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="url"
+                    value={documentUrl}
+                    onChange={(e) => setDocumentUrl(e.target.value)}
+                    placeholder="أو الصق رابط الملف هنا"
+                    dir="ltr"
+                    className="w-full px-4 py-3 mt-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              )}
+
+              {type === "LINK" && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">الرابط المرجعي</label>
+                  <input
+                    type="url"
+                    value={referenceUrl}
+                    onChange={(e) => setReferenceUrl(e.target.value)}
+                    placeholder="https://example.com/ref"
+                    required
+                    dir="ltr"
+                    className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    مصدر أو مرجع إضافي يمكن للطلاب فتحه
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting || uploading}
+                className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2 inline" />
+                    جاري الإضافة...
+                  </>
+                ) : (
+                  "إضافة الدرس"
+                )}
+              </button>
+            </form>
           </div>
         </div>
       )}
