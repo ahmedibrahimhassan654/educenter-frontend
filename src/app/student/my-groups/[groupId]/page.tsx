@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import api, { clearCache } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
+import VideoPlayer from "@/components/video-player";
 import { Group, Entitlement } from "@/types";
 import { getSubjectColor } from "@/lib/subject-colors";
 import { toast } from "sonner";
@@ -47,6 +48,10 @@ interface StudentLesson {
   videoUrl?: string;
   documentUrl?: string;
   referenceUrl?: string;
+  recordedLiveVideoUrl?: string;
+  recordedVideoUrl?: string;
+  documents?: string[];
+  referenceLinks?: string[];
   scheduleDay?: string;
   scheduleTime?: string;
   scheduledAt?: string;
@@ -375,10 +380,9 @@ export default function StudentGroupPage() {
                 </span>
                 فيديو وصف المجموعة
               </h3>
-              <video
+              <VideoPlayer
                 src={group.descriptionVideo}
-                controls
-                className="w-full rounded-xl max-h-96 bg-muted"
+                className="w-full max-h-96"
               />
             </div>
           )}
@@ -497,6 +501,70 @@ export default function StudentGroupPage() {
                                   </a>
                                 </div>
                               )}
+                              {lesson.type === "LIVE" && lesson.recordedLiveVideoUrl && (
+                                <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-3 space-y-2">
+                                  <p className="text-xs font-bold text-muted-foreground">
+                                    تسجيل الحصة
+                                  </p>
+                                  <VideoPlayer
+                                    src={lesson.recordedLiveVideoUrl}
+                                    className="w-full max-h-56"
+                                  />
+                                </div>
+                              )}
+                              {lesson.type === "LIVE" && lesson.recordedVideoUrl && (
+                                <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 space-y-2">
+                                  <p className="text-xs font-bold text-muted-foreground">
+                                    فيديو إضافي
+                                  </p>
+                                  <VideoPlayer
+                                    src={lesson.recordedVideoUrl}
+                                    className="w-full max-h-56"
+                                  />
+                                </div>
+                              )}
+                              {lesson.type === "LIVE" &&
+                                Array.isArray(lesson.documents) &&
+                                lesson.documents.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-xs font-bold text-muted-foreground">
+                                      المستندات ({lesson.documents.length})
+                                    </p>
+                                    {lesson.documents.map((doc, i) => (
+                                      <a
+                                        key={i}
+                                        href={doc}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
+                                      >
+                                        <FileText className="w-3.5 h-3.5" />
+                                        فتح المستند {i + 1}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              {lesson.type === "LIVE" &&
+                                Array.isArray(lesson.referenceLinks) &&
+                                lesson.referenceLinks.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-xs font-bold text-muted-foreground">
+                                      الروابط المرجعية ({lesson.referenceLinks.length})
+                                    </p>
+                                    {lesson.referenceLinks.map((link, i) => (
+                                      <a
+                                        key={i}
+                                        href={link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
+                                      >
+                                        <Link2 className="w-3.5 h-3.5" />
+                                        فتح الرابط المرجعي {i + 1}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
                               {lesson.type === "RECORDED" && lesson.videoUrl && (
                                 <a
                                   href={lesson.videoUrl}

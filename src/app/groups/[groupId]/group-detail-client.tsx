@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import TeacherAvatar from "@/components/teacher-avatar";
 import Reveal from "@/components/reveal";
+import VideoPlayer from "@/components/video-player";
 import { useAuth } from "@/components/auth-provider";
 import { PublicGroupDetail } from "@/types";
 import {
@@ -287,9 +288,8 @@ export default function GroupDetailClient() {
                   </span>
                 </div>
                 <div className="relative rounded-2xl overflow-hidden bg-muted shadow-inner ring-1 ring-black/5">
-                  <video
+                  <VideoPlayer
                     src={group.descriptionVideo}
-                    controls
                     className="w-full max-h-[28rem]"
                   />
                 </div>

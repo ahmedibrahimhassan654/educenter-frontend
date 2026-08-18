@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import VideoPlayer from "@/components/video-player";
 import {
   Users,
   Plus,
@@ -1235,7 +1236,7 @@ function renderModalContent(
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <video src={formData.descriptionVideo} controls className="w-full rounded-lg max-h-48" />
+            <VideoPlayer src={formData.descriptionVideo} className="w-full max-h-48" />
           </div>
         ) : (
           <label className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors">

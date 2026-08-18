@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import VideoPlayer from "@/components/video-player";
 import {
   Users,
   Plus,
@@ -310,10 +311,9 @@ export default function AdminGroupsPage() {
                         <PlayCircle className="w-4 h-4 text-primary" />
                         فيديو وصف المجموعة
                       </p>
-                      <video
+                      <VideoPlayer
                         src={group.descriptionVideo}
-                        controls
-                        className="w-full rounded-lg max-h-72 bg-muted"
+                        className="w-full max-h-72"
                       />
                     </div>
                   )}

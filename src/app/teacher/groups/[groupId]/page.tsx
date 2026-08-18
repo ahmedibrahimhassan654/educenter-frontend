@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import api, { clearCache } from "@/lib/api";
-import { getSupabase } from "@/lib/supabase";
+import VideoPlayer from "@/components/video-player";
 import { Group } from "@/types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,11 +42,11 @@ import {
   ChevronRight,
   CheckCircle2,
   ClipboardCheck,
-  Layers,
   Clock,
   ExternalLink,
   Package,
   Play,
+  Zap,
 } from "lucide-react";
 
 interface SuggestedStudent {
@@ -88,6 +88,10 @@ interface LessonItem {
   videoUrl?: string;
   documentUrl?: string;
   referenceUrl?: string;
+  recordedLiveVideoUrl?: string;
+  recordedVideoUrl?: string;
+  documents?: string[];
+  referenceLinks?: string[];
   scheduleDay?: string;
   scheduleTime?: string;
   scheduledAt?: string;
@@ -142,9 +146,9 @@ const LESSON_TYPE_META: Record<
 };
 
 const LESSON_STEPS = [
-  { label: "نوع الدرس", Icon: Layers, gradient: "from-violet-600 via-purple-600 to-fuchsia-700" },
   { label: "العنوان والوصف", Icon: FileText, gradient: "from-blue-600 via-sky-600 to-cyan-700" },
-  { label: "محتوى الدرس", Icon: Package, gradient: "from-amber-500 via-orange-500 to-rose-600" },
+  { label: "الجلسة المباشرة", Icon: Video, gradient: "from-rose-500 via-red-500 to-rose-700" },
+  { label: "مرفقات إضافية", Icon: Package, gradient: "from-amber-500 via-orange-500 to-rose-600" },
   { label: "المراجعة", Icon: ClipboardCheck, gradient: "from-emerald-600 via-teal-600 to-green-700" },
 ];
 
@@ -191,14 +195,16 @@ export default function GroupDetailPage() {
   }, [groupId]);
 
   const fetchLessons = useCallback(async () => {
-    if (!groupId) return;
+    if (!groupId) return [];
     setLessonsLoading(true);
     try {
       clearCache(`/groups/${groupId}/lessons`);
       const res = await api.get(`/groups/${groupId}/lessons`);
-      setLessons(res.data?.data || []);
+      const data: LessonItem[] = res.data?.data || [];
+      setLessons(data);
+      return data;
     } catch {
-      // ignore
+      return [];
     } finally {
       setLessonsLoading(false);
     }
@@ -683,10 +689,9 @@ export default function GroupDetailPage() {
               <PlayCircle className="w-5 h-5 text-primary" />
               فيديو وصف المجموعة
             </h3>
-            <video
+            <VideoPlayer
               src={group.descriptionVideo}
-              controls
-              className="w-full rounded-lg max-h-96 bg-muted"
+              className="w-full max-h-96"
             />
           </div>
         )}
@@ -874,7 +879,7 @@ export default function GroupDetailPage() {
             <div>
               <h3 className="text-xl font-bold">الدروس</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                أضف دروساً مباشرة، فيديوهات مسجلة، مستندات، أو روابط مرجعية لطلابك
+                أضف دروساً مباشرة مع فيديوهات مسجلة ومستندات وروابط مرجعية لطلابك
               </p>
             </div>
             <AddLessonModal
@@ -898,7 +903,7 @@ export default function GroupDetailPage() {
               </div>
               <h3 className="text-xl font-bold mb-2">لا توجد دروس بعد</h3>
               <p className="text-muted-foreground">
-                أضف أول درس لك الآن - بث مباشر، فيديو مسجل، مستند، أو رابط مرجعي
+                أضف أول درس لك الآن - جلسة مباشرة مع فيديوهات ومستندات وروابط مرجعية
               </p>
             </div>
           ) : (
@@ -961,6 +966,35 @@ export default function GroupDetailPage() {
                             {new Date(lesson.createdAt).toLocaleDateString("ar-EG")}
                           </p>
                         )}
+                        {lesson.type === "LIVE" && (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                            {lesson.recordedLiveVideoUrl && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 text-[11px] font-semibold">
+                                <Radio className="w-3 h-3" />
+                                تسجيل الحصة
+                              </span>
+                            )}
+                            {lesson.recordedVideoUrl && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 text-[11px] font-semibold">
+                                <Play className="w-3 h-3" />
+                                فيديو إضافي
+                              </span>
+                            )}
+                            {Array.isArray(lesson.documents) && lesson.documents.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[11px] font-semibold">
+                                <FileText className="w-3 h-3" />
+                                {lesson.documents.length} مستند
+                              </span>
+                            )}
+                            {Array.isArray(lesson.referenceLinks) &&
+                              lesson.referenceLinks.length > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[11px] font-semibold">
+                                  <Link2 className="w-3 h-3" />
+                                  {lesson.referenceLinks.length} رابط
+                                </span>
+                              )}
+                          </div>
+                        )}
                       </div>
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
@@ -1017,11 +1051,20 @@ export default function GroupDetailPage() {
       {/* Lesson details modal */}
       {selectedLesson && (
         <LessonDetailsModal
+          groupId={groupId}
           lesson={selectedLesson}
           onClose={() => setSelectedLesson(null)}
           onDelete={(id) => {
             handleDeleteLesson(id);
             setSelectedLesson(null);
+          }}
+          onLessonUpdated={async () => {
+            const freshList = await fetchLessons();
+            setSelectedLesson((current) =>
+              current
+                ? freshList.find((l) => l._id === current._id) || current
+                : current
+            );
           }}
         />
       )}
@@ -1578,6 +1621,37 @@ function AddStudentModal({
   );
 }
 
+// Upload a file to a signed storage URL while reporting progress. The backend
+// returns `uploadUrl` (with the upload token embedded) from /upload-url.
+function uploadToUrlWithProgress(
+  url: string,
+  file: File,
+  onProgress: (percent: number) => void
+): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+      }
+    };
+    xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.onabort = () => reject(new Error("Upload aborted"));
+    xhr.send(file);
+  });
+}
+
+// Normalize a reference link: keep absolute URLs, otherwise assume https.
+function normalizeReferenceLink(value: string): string {
+  const v = value.trim();
+  if (!v) return "";
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(v)) return v;
+  return `https://${v}`;
+}
+
 function ReviewRow({
   label,
   value,
@@ -1620,7 +1694,6 @@ function AddLessonModal({
   onEditClosed?: () => void;
 }) {
   const [showModal, setShowModal] = useState(false);
-  const [type, setType] = useState<LessonType>("LIVE");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [meetingLink, setMeetingLink] = useState("");
@@ -1628,33 +1701,46 @@ function AddLessonModal({
     defaultMeetingLink ? "group" : "custom"
   );
   const [scheduleSlot, setScheduleSlot] = useState(scheduleDays[0] || "");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [documentUrl, setDocumentUrl] = useState("");
-  const [referenceUrl, setReferenceUrl] = useState("");
+  const [recordedVideoUrl, setRecordedVideoUrl] = useState("");
+  const [recordedVideoUrlInput, setRecordedVideoUrlInput] = useState("");
+  const [documents, setDocuments] = useState<string[]>([]);
+  const [documentInput, setDocumentInput] = useState("");
+  const [referenceLinks, setReferenceLinks] = useState<string[]>([]);
+  const [referenceLinkInput, setReferenceLinkInput] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadTarget, setUploadTarget] = useState<"video" | "document" | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recordedVideoInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editingLesson) {
       const l = editingLesson;
-      setType(l.type);
       setTitle(l.title);
       setDescription(l.description || "");
       setMeetingLink(l.meetingLink || "");
       setMeetingLinkMode(
-        l.meetingLink && defaultMeetingLink && l.meetingLink === defaultMeetingLink ? "group" : "custom"
+        l.meetingLink && defaultMeetingLink && l.meetingLink === defaultMeetingLink
+          ? "group"
+          : "custom"
       );
       setScheduleSlot(
         l.scheduleDay && l.scheduleTime
           ? `${l.scheduleDay} ${l.scheduleTime}`
           : scheduleDays[0] || ""
       );
-      setVideoUrl(l.videoUrl || "");
-      setDocumentUrl(l.documentUrl || "");
-      setReferenceUrl(l.referenceUrl || "");
+      setRecordedVideoUrl(l.recordedVideoUrl || l.videoUrl || "");
+      setDocuments(l.documents?.length ? [...l.documents] : l.documentUrl ? [l.documentUrl] : []);
+      setReferenceLinks(
+        l.referenceLinks?.length
+          ? [...l.referenceLinks]
+          : l.referenceUrl
+          ? [l.referenceUrl]
+          : []
+      );
       setStep(0);
       setDirection("forward");
       setShowModal(true);
@@ -1673,10 +1759,12 @@ function AddLessonModal({
     setMeetingLink("");
     setMeetingLinkMode(defaultMeetingLink ? "group" : "custom");
     setScheduleSlot(scheduleDays[0] || "");
-    setVideoUrl("");
-    setDocumentUrl("");
-    setReferenceUrl("");
-    setType("LIVE");
+    setRecordedVideoUrl("");
+    setRecordedVideoUrlInput("");
+    setDocuments([]);
+    setDocumentInput("");
+    setReferenceLinks([]);
+    setReferenceLinkInput("");
     setStep(0);
     setDirection("forward");
   };
@@ -1711,10 +1799,11 @@ function AddLessonModal({
     });
   };
 
-  const scheduledDate = type === "LIVE" ? nextDateFor(scheduleSlot) : "";
+  const scheduledDate = nextDateFor(scheduleSlot);
 
   const uploadAttachment = async (file: File) => {
     setUploading(true);
+    setUploadProgress(0);
     try {
       // The backend issues a signed upload URL; the file goes straight to
       // Supabase Storage so large recorded videos are not buffered by the API.
@@ -1722,36 +1811,56 @@ function AddLessonModal({
         filename: file.name,
         mimeType: file.type || "application/octet-stream",
       });
-      const { bucket, path, token, fullPath } = res.data;
+      const { uploadUrl, fullPath } = res.data;
 
-      const supabase = getSupabase();
-      const { error } = await supabase.storage
-        .from(bucket)
-        .uploadToSignedUrl(path, token, file, {
-          contentType: file.type || "application/octet-stream",
-        });
-      if (error) throw error;
+      const uploaded = await uploadToUrlWithProgress(uploadUrl, file, setUploadProgress);
+      if (!uploaded) throw new Error("فشل رفع الملف إلى التخزين");
+      setUploadProgress(100);
 
       return fullPath as string;
     } finally {
       setUploading(false);
+      setUploadTarget(null);
+      setUploadProgress(null);
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    target: "video" | "document"
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadTarget(target);
     try {
       const url = await uploadAttachment(file);
-      if (type === "RECORDED") setVideoUrl(url);
-      else if (type === "DOCUMENT") setDocumentUrl(url);
+      if (target === "video") setRecordedVideoUrl(url);
+      else setDocuments((prev) => [...prev, url]);
       toast.success("تم رفع الملف بنجاح");
     } catch (error) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       toast.error(axiosError.response?.data?.message || "فشل في رفع الملف");
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      const input =
+        target === "video" ? recordedVideoInputRef.current : documentInputRef.current;
+      if (input) input.value = "";
     }
+  };
+
+  const addDocument = () => {
+    const value = documentInput.trim();
+    if (!value) return;
+    if (documents.includes(value)) return;
+    setDocuments((prev) => [...prev, value]);
+    setDocumentInput("");
+  };
+
+  const addReferenceLink = () => {
+    const value = normalizeReferenceLink(referenceLinkInput);
+    if (!value) return;
+    if (referenceLinks.includes(value)) return;
+    setReferenceLinks((prev) => [...prev, value]);
+    setReferenceLinkInput("");
   };
 
   const lessonVideoPreviewSrc = (raw: string) =>
@@ -1764,19 +1873,39 @@ function AddLessonModal({
     try {
       const liveSlot = scheduleSlot.match(/^(.+?)\s+(\d{1,2}:\d{2})/);
       const liveMeetingLink =
-        type === "LIVE" && meetingLinkMode === "group"
-          ? defaultMeetingLink || ""
-          : meetingLink;
+        meetingLinkMode === "group" ? defaultMeetingLink || "" : meetingLink;
+
+      // Flush anything still typed in the extra-files inputs so a link pasted
+      // but not committed via "إضافة" is still saved with the lesson.
+      const pendingDoc = documentInput.trim();
+      const docs =
+        pendingDoc && !documents.includes(pendingDoc)
+          ? [...documents, pendingDoc]
+          : documents;
+      const pendingLink = normalizeReferenceLink(referenceLinkInput);
+      const links =
+        pendingLink && !referenceLinks.includes(pendingLink)
+          ? [...referenceLinks, pendingLink]
+          : referenceLinks;
+      if (pendingDoc) {
+        setDocuments(docs);
+        setDocumentInput("");
+      }
+      if (pendingLink) {
+        setReferenceLinks(links);
+        setReferenceLinkInput("");
+      }
+
       const payload = {
         title,
         description,
-        type,
-        meetingLink: type === "LIVE" ? liveMeetingLink : undefined,
-        scheduleDay: type === "LIVE" && liveSlot ? liveSlot[1] : undefined,
-        scheduleTime: type === "LIVE" && liveSlot ? liveSlot[2] : undefined,
-        videoUrl: type === "RECORDED" ? videoUrl : undefined,
-        documentUrl: type === "DOCUMENT" ? documentUrl : undefined,
-        referenceUrl: type === "LINK" ? referenceUrl : undefined,
+        type: "LIVE",
+        meetingLink: liveMeetingLink,
+        scheduleDay: liveSlot ? liveSlot[1] : undefined,
+        scheduleTime: liveSlot ? liveSlot[2] : undefined,
+        recordedVideoUrl: recordedVideoUrl || undefined,
+        documents: docs,
+        referenceLinks: links,
       };
       if (editingLesson) {
         await api.put(`/groups/${groupId}/lessons/${editingLesson._id}`, payload);
@@ -1798,30 +1927,31 @@ function AddLessonModal({
   };
 
   const goNext = () => {
-    if (step === 1 && !title.trim()) {
+    if (step === 0 && !title.trim()) {
       toast.error("أدخل عنوان الدرس أولاً");
       return;
     }
-    if (step === 2) {
-      if (type === "LIVE") {
-        if (scheduleDays.length > 0 && !scheduleSlot.trim()) {
-          toast.error("اختر يوم ووقت الحصة");
-          return;
-        }
-        if (meetingLinkMode === "custom" && !meetingLink.trim()) {
-          toast.error("أدخل رابط الاجتماع المباشر");
-          return;
-        }
-      } else if (type === "RECORDED" && !videoUrl.trim()) {
-        toast.error("أرفع فيديو الحصة المسجل أو ألصق رابطه");
-        return;
-      } else if (type === "DOCUMENT" && !documentUrl.trim()) {
-        toast.error("أرفع المستند أو ألصق رابطه");
-        return;
-      } else if (type === "LINK" && !referenceUrl.trim()) {
-        toast.error("أدخل الرابط المرجعي");
+    if (step === 1) {
+      if (scheduleDays.length > 0 && !scheduleSlot.trim()) {
+        toast.error("اختر يوم ووقت الحصة");
         return;
       }
+      if (meetingLinkMode === "custom" && !meetingLink.trim()) {
+        toast.error("أدخل رابط الاجتماع المباشر");
+        return;
+      }
+    }
+    if (step === 2) {
+      const pendingDoc = documentInput.trim();
+      if (pendingDoc && !documents.includes(pendingDoc)) {
+        setDocuments((prev) => [...prev, pendingDoc]);
+      }
+      setDocumentInput("");
+      const pendingLink = normalizeReferenceLink(referenceLinkInput);
+      if (pendingLink && !referenceLinks.includes(pendingLink)) {
+        setReferenceLinks((prev) => [...prev, pendingLink]);
+      }
+      setReferenceLinkInput("");
     }
     setDirection("forward");
     setStep((s) => Math.min(s + 1, LESSON_STEPS.length - 1));
@@ -1832,7 +1962,6 @@ function AddLessonModal({
     setStep((s) => Math.max(s - 1, 0));
   };
 
-  const typeMeta = LESSON_TYPE_META[type];
   const StepIcon = LESSON_STEPS[step].Icon;
 
   return (
@@ -1944,68 +2073,14 @@ function AddLessonModal({
                 }`}
               >
                 {step === 0 && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      اختر نوع الدرس الذي تريد إضافته لطلابك
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(Object.keys(LESSON_TYPE_META) as LessonType[]).map((t) => {
-                        const m = LESSON_TYPE_META[t];
-                        const active = type === t;
-                        return (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setType(t)}
-                            className={`relative group/type overflow-hidden p-4 rounded-2xl border text-right transition-all duration-300 ${
-                              active
-                                ? "border-transparent ring-2 ring-offset-2 ring-primary shadow-lg"
-                                : "bg-card border-border hover:-translate-y-0.5 hover:shadow-md"
-                            }`}
-                          >
-                            <div
-                              className={`absolute inset-0 opacity-10 transition-opacity duration-300 ${
-                                active ? "opacity-100" : "opacity-0 group-hover/type:opacity-60"
-                              } bg-gradient-to-br ${m.gradient}`}
-                            />
-                            <div className="relative flex items-start gap-3">
-                              <div
-                                className={`w-12 h-12 rounded-xl ${m.bg} flex items-center justify-center shrink-0 transition-transform duration-300 ${
-                                  active ? "scale-110" : "group-hover/type:scale-110"
-                                }`}
-                              >
-                                <m.Icon className={`w-6 h-6 ${m.color}`} />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-bold text-sm">{m.label}</p>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                  {t === "LIVE" && "بث مباشر مع الطلاب وفق جدول المجموعة"}
-                                  {t === "RECORDED" && "فيديو مسجل للحصة يطلع عليه الطلاب"}
-                                  {t === "DOCUMENT" && "ملف مرفق مثل PDF أو عروض تقديمية"}
-                                  {t === "LINK" && "رابط مرجعي خارجي للطلاب"}
-                                </p>
-                              </div>
-                              {active && (
-                                <span className="absolute top-3 left-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center animate-scale-in">
-                                  <Check className="w-3.5 h-3.5" />
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {step === 1 && (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
+                      <label className="flex text-sm font-semibold mb-2 items-center gap-2">
                         <span className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
                           <FileText className="w-4 h-4" />
                         </span>
                         عنوان الدرس
+                        <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -2016,7 +2091,7 @@ function AddLessonModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
+                      <label className="flex text-sm font-semibold mb-2 items-center gap-2">
                         <span className="w-7 h-7 rounded-lg bg-violet-500/10 text-violet-600 flex items-center justify-center">
                           <Info className="w-4 h-4" />
                         </span>
@@ -2030,17 +2105,21 @@ function AddLessonModal({
                         className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-violet-500/60 focus:border-violet-400 transition-all resize-none"
                       />
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      كل درس يتضمن جلسة مباشرة (إلزامية) مع إمكانية إضافة فيديوهات ومستندات وروابط مرجعية.
+                    </p>
                   </div>
                 )}
 
-                {step === 2 && type === "LIVE" && (
+                {step === 1 && (
                   <div className="space-y-4">
                     <div className="rounded-2xl border-t-4 border-rose-500/50 bg-rose-500/5 p-4">
-                      <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
+                      <label className="flex text-sm font-semibold mb-2 items-center gap-2">
                         <span className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center">
                           <Calendar className="w-4 h-4" />
                         </span>
                         يوم ووقت الحصة (من جدول المجموعة)
+                        <span className="text-rose-500">*</span>
                       </label>
                       {scheduleDays.length > 0 ? (
                         <>
@@ -2073,11 +2152,12 @@ function AddLessonModal({
                     </div>
 
                     <div className="rounded-2xl border-t-4 border-rose-500/50 bg-rose-500/5 p-4">
-                      <label className="block text-sm font-semibold mb-3 flex items-center gap-2">
+                      <label className="flex text-sm font-semibold mb-3 items-center gap-2">
                         <span className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center">
                           <Video className="w-4 h-4" />
                         </span>
                         رابط الاجتماع المباشر
+                        <span className="text-rose-500">*</span>
                       </label>
                       {defaultMeetingLink ? (
                         <div className="space-y-2">
@@ -2158,148 +2238,278 @@ function AddLessonModal({
                   </div>
                 )}
 
-              {step === 2 && type === "RECORDED" && (
-                  <div className="rounded-2xl border-t-4 border-blue-500/50 bg-blue-500/5 p-4 space-y-4">
-                    <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
-                      <span className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
-                        <Radio className="w-4 h-4" />
-                      </span>
-                      فيديو الحصة المسجل
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="video/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                        className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-sm font-bold shadow-lg shadow-blue-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
-                      >
-                        {uploading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            جاري الرفع...
-                          </>
-                        ) : (
-                          <Upload className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
-                        )}
-                        {!uploading && "رفع فيديو"}
-                      </button>
-                      {videoUrl && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-semibold animate-scale-in">
-                          <Check className="w-3.5 h-3.5" />
-                          تم رفع الفيديو
+                {step === 2 && (
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border-t-4 border-blue-500/50 bg-blue-500/5 p-4 space-y-3">
+                      <label className="flex text-sm font-semibold mb-1 items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                          <Radio className="w-4 h-4" />
                         </span>
-                      )}
-                    </div>
-                    {videoUrl && (
-                      <video
-                        key={videoUrl}
-                        src={lessonVideoPreviewSrc(videoUrl)}
-                        controls
-                        className="w-full rounded-xl bg-black max-h-64 animate-fade-in"
+                        فيديو إضافي (اختياري)
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        فيديو مسجل خاص بالدرس مثل حل أسئلة أو شرح إضافي
+                      </p>
+                      <input
+                        ref={recordedVideoInputRef}
+                        type="file"
+                        accept="video/*"
+                        onChange={(e) => handleFileChange(e, "video")}
+                        className="hidden"
                       />
-                    )}
-                    <input
-                      type="text"
-                      value={videoUrl}
-                      onChange={(e) => setVideoUrl(e.target.value)}
-                      placeholder="أو الصق رابط الفيديو هنا"
-                      dir="ltr"
-                      className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-400 transition-all"
-                    />
-                  </div>
-                )}
-
-                {step === 2 && type === "DOCUMENT" && (
-                  <div className="rounded-2xl border-t-4 border-amber-500/50 bg-amber-500/5 p-4 space-y-4">
-                    <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
-                      <span className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                        <FileText className="w-4 h-4" />
-                      </span>
-                      ملف المستند
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.png,.jpg,.jpeg"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                        className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-amber-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
-                      >
-                        {uploading ? (
-                          <>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => recordedVideoInputRef.current?.click()}
+                          disabled={uploading && uploadTarget === "video"}
+                          className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-sm font-bold shadow-lg shadow-blue-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
+                        >
+                          {uploading && uploadTarget === "video" ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            جاري الرفع...
-                          </>
-                        ) : (
-                          <Upload className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
+                          ) : (
+                            <Upload className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
+                          )}
+                          {uploading && uploadTarget === "video" ? (
+                            uploadProgress != null ? `جاري الرفع... ${uploadProgress}%` : "جاري الرفع..."
+                          ) : (
+                            "رفع فيديو"
+                          )}
+                        </button>
+                        {recordedVideoUrl && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-semibold animate-scale-in">
+                            <Check className="w-3.5 h-3.5" />
+                            تم إضافة الفيديو
+                          </span>
                         )}
-                        {!uploading && "رفع مستند"}
-                      </button>
-                      {documentUrl && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-semibold animate-scale-in">
-                          <Check className="w-3.5 h-3.5" />
-                          تم رفع المستند
-                        </span>
+                      </div>
+                      {uploading && uploadTarget === "video" && uploadProgress != null && (
+                        <div className="h-1.5 rounded-full bg-background border overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 transition-all duration-200"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      )}
+                      {uploading && uploadTarget === "video" && (
+                        <p className="text-[11px] text-muted-foreground">
+                          الفيديوهات الكبيرة قد تستغرق دقائق في الرفع — يبدأ التشغيل فوراً بعد التحسين.
+                        </p>
+                      )}
+                      {recordedVideoUrl && (
+                        <VideoPlayer
+                          key={recordedVideoUrl}
+                          src={lessonVideoPreviewSrc(recordedVideoUrl)}
+                          className="w-full max-h-64 animate-fade-in"
+                        />
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={recordedVideoUrlInput}
+                          onChange={(e) => setRecordedVideoUrlInput(e.target.value)}
+                          placeholder="أو الصق رابط الفيديو هنا"
+                          dir="ltr"
+                          className="flex-1 min-w-0 px-4 py-2.5 bg-background border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-400 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (recordedVideoUrlInput.trim()) {
+                              setRecordedVideoUrl(recordedVideoUrlInput.trim());
+                              setRecordedVideoUrlInput("");
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-500/10 text-blue-600 text-sm font-bold hover:bg-blue-500/20 transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          إضافة
+                        </button>
+                      </div>
+                      {recordedVideoUrl && (
+                        <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background border">
+                          <span className="text-xs text-muted-foreground truncate" dir="ltr">
+                            {recordedVideoUrl}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setRecordedVideoUrl("")}
+                            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-red-500 hover:bg-red-500/10 transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            إزالة
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <input
-                      type="text"
-                      value={documentUrl}
-                      onChange={(e) => setDocumentUrl(e.target.value)}
-                      placeholder="أو الصق رابط الملف هنا"
-                      dir="ltr"
-                      className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-amber-500/60 focus:border-amber-400 transition-all"
-                    />
-                  </div>
-                )}
 
-                {step === 2 && type === "LINK" && (
-                  <div className="rounded-2xl border-t-4 border-emerald-500/50 bg-emerald-500/5 p-4 space-y-3">
-                    <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
-                      <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                        <Link2 className="w-4 h-4" />
-                      </span>
-                      الرابط المرجعي
-                    </label>
-                    <input
-                      type="url"
-                      value={referenceUrl}
-                      onChange={(e) => setReferenceUrl(e.target.value)}
-                      placeholder="https://example.com/ref"
-                      dir="ltr"
-                      className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-400 transition-all"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      مصدر أو مرجع إضافي يمكن للطلاب فتحه
-                    </p>
+                    <div className="rounded-2xl border-t-4 border-amber-500/50 bg-amber-500/5 p-4 space-y-3">
+                      <label className="flex text-sm font-semibold mb-1 items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                          <FileText className="w-4 h-4" />
+                        </span>
+                        المرفقات والمستندات (اختياري)
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        ملفات مثل PDF أو عروض تقديمية خاصة بالدرس
+                      </p>
+                      <input
+                        ref={documentInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.png,.jpg,.jpeg"
+                        onChange={(e) => handleFileChange(e, "document")}
+                        className="hidden"
+                      />
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => documentInputRef.current?.click()}
+                          disabled={uploading && uploadTarget === "document"}
+                          className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-amber-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
+                        >
+                          {uploading && uploadTarget === "document" ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Upload className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
+                          )}
+                          {uploading && uploadTarget === "document" ? (
+                            uploadProgress != null ? `جاري الرفع... ${uploadProgress}%` : "جاري الرفع..."
+                          ) : (
+                            "رفع مستند"
+                          )}
+                        </button>
+                      </div>
+                      {uploading && uploadTarget === "document" && uploadProgress != null && (
+                        <div className="h-1.5 rounded-full bg-background border overflow-hidden">
+                          <div
+                            className="h-full bg-amber-500 transition-all duration-200"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={documentInput}
+                          onChange={(e) => setDocumentInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addDocument();
+                            }
+                          }}
+                          placeholder="أو الصق رابط ملف هنا ثم اضغط إضافة"
+                          dir="ltr"
+                          className="flex-1 min-w-0 px-4 py-2.5 bg-background border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/60 focus:border-amber-400 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={addDocument}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500/10 text-amber-600 text-sm font-bold hover:bg-amber-500/20 transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          إضافة
+                        </button>
+                      </div>
+                      {documents.length > 0 && (
+                        <ul className="space-y-2">
+                          {documents.map((doc, i) => (
+                            <li
+                              key={i}
+                              className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background border"
+                            >
+                              <span className="text-xs text-muted-foreground truncate" dir="ltr">
+                                {doc}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDocuments((prev) => prev.filter((_, idx) => idx !== i))
+                                }
+                                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-red-500 hover:bg-red-500/10 transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                إزالة
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="rounded-2xl border-t-4 border-emerald-500/50 bg-emerald-500/5 p-4 space-y-3">
+                      <label className="flex text-sm font-semibold mb-1 items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                          <Link2 className="w-4 h-4" />
+                        </span>
+                        روابط مرجعية (اختياري)
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        مصادر أو مراجع إضافية يمكن للطلاب فتحها
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={referenceLinkInput}
+                          onChange={(e) => setReferenceLinkInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addReferenceLink();
+                            }
+                          }}
+                          placeholder="https://example.com/ref"
+                          dir="ltr"
+                          className="flex-1 min-w-0 px-4 py-2.5 bg-background border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-400 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={addReferenceLink}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 text-sm font-bold hover:bg-emerald-500/20 transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          إضافة
+                        </button>
+                      </div>
+                      {referenceLinks.length > 0 && (
+                        <ul className="space-y-2">
+                          {referenceLinks.map((link, i) => (
+                            <li
+                              key={i}
+                              className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background border"
+                            >
+                              <span className="text-xs text-muted-foreground truncate" dir="ltr">
+                                {link}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setReferenceLinks((prev) => prev.filter((_, idx) => idx !== i))
+                                }
+                                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-red-500 hover:bg-red-500/10 transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                إزالة
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 {step === 3 && (
                   <div className="space-y-4">
                     <div className="overflow-hidden rounded-2xl border animate-fade-in">
-                      <div
-                        className={`bg-gradient-to-l ${typeMeta.gradient} px-5 py-4 text-white flex items-center gap-3`}
-                      >
+                      <div className="bg-gradient-to-l from-rose-500 via-red-500 to-rose-700 px-5 py-4 text-white flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-                          <typeMeta.Icon className="w-5 h-5" />
+                          <Video className="w-5 h-5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[11px] text-white/80 font-semibold">نوع الدرس</p>
-                          <p className="font-extrabold">{typeMeta.label}</p>
+                          <p className="text-[11px] text-white/80 font-semibold">
+                            الجلسة المباشرة (إلزامية)
+                          </p>
+                          <p className="font-extrabold">درس مباشر</p>
                         </div>
                         <span className="mr-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-xs font-bold">
                           <Check className="w-3.5 h-3.5" />
@@ -2311,32 +2521,64 @@ function AddLessonModal({
                         {description && (
                           <ReviewRow label="الوصف" value={description} multiline />
                         )}
-                        {type === "LIVE" && (
-                          <>
-                            <ReviewRow
-                              label="الموعد"
-                              value={`${scheduleSlot}${
-                                scheduledDate ? ` (الموعد التلقائي: ${scheduledDate})` : ""
-                              }`}
-                            />
-                            <ReviewRow
-                              label="رابط الاجتماع"
-                              value={meetingLinkMode === "group" ? defaultMeetingLink || "" : meetingLink}
-                              dir="ltr"
-                            />
-                          </>
-                        )}
-                        {type === "RECORDED" && videoUrl && (
-                          <ReviewRow label="فيديو الحصة المسجل" value={videoUrl} dir="ltr" />
-                        )}
-                        {type === "DOCUMENT" && documentUrl && (
-                          <ReviewRow label="المستند" value={documentUrl} dir="ltr" />
-                        )}
-                        {type === "LINK" && referenceUrl && (
-                          <ReviewRow label="الرابط المرجعي" value={referenceUrl} dir="ltr" />
-                        )}
+                        <ReviewRow
+                          label="الموعد"
+                          value={`${scheduleSlot}${
+                            scheduledDate ? ` (الموعد التلقائي: ${scheduledDate})` : ""
+                          }`}
+                        />
+                        <ReviewRow
+                          label="رابط الاجتماع"
+                          value={meetingLinkMode === "group" ? defaultMeetingLink || "" : meetingLink}
+                          dir="ltr"
+                        />
                       </div>
                     </div>
+
+                    {recordedVideoUrl && (
+                      <div className="overflow-hidden rounded-2xl border animate-fade-in">
+                        <div className="bg-gradient-to-l from-blue-500 via-sky-500 to-indigo-700 px-5 py-3.5 text-white flex items-center gap-2.5">
+                          <Radio className="w-5 h-5" />
+                          <p className="font-bold text-sm">فيديو إضافي</p>
+                        </div>
+                        <div className="p-4 bg-card">
+                          <ReviewRow label="رابط الفيديو" value={recordedVideoUrl} dir="ltr" />
+                        </div>
+                      </div>
+                    )}
+
+                    {documents.length > 0 && (
+                      <div className="overflow-hidden rounded-2xl border animate-fade-in">
+                        <div className="bg-gradient-to-l from-amber-500 via-orange-500 to-yellow-600 px-5 py-3.5 text-white flex items-center gap-2.5">
+                          <FileText className="w-5 h-5" />
+                          <p className="font-bold text-sm">
+                            المستندات ({documents.length})
+                          </p>
+                        </div>
+                        <div className="p-4 space-y-2 bg-card">
+                          {documents.map((doc, i) => (
+                            <ReviewRow key={i} label={`مستند ${i + 1}`} value={doc} dir="ltr" />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {referenceLinks.length > 0 && (
+                      <div className="overflow-hidden rounded-2xl border animate-fade-in">
+                        <div className="bg-gradient-to-l from-emerald-500 via-teal-500 to-cyan-700 px-5 py-3.5 text-white flex items-center gap-2.5">
+                          <Link2 className="w-5 h-5" />
+                          <p className="font-bold text-sm">
+                            الروابط المرجعية ({referenceLinks.length})
+                          </p>
+                        </div>
+                        <div className="p-4 space-y-2 bg-card">
+                          {referenceLinks.map((link, i) => (
+                            <ReviewRow key={i} label={`رابط ${i + 1}`} value={link} dir="ltr" />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <p className="text-center text-xs text-muted-foreground animate-fade-in">
                       راجع بيانات الدرس ثم اضغط على زر الحفظ
                     </p>
@@ -2391,16 +2633,28 @@ function AddLessonModal({
 }
 
 function LessonDetailsModal({
+  groupId,
   lesson,
   onClose,
   onDelete,
+  onLessonUpdated,
 }: {
+  groupId: string;
   lesson: LessonItem;
   onClose: () => void;
   onDelete: (id: string) => void;
+  onLessonUpdated?: () => void;
 }) {
   const meta = LESSON_TYPE_META[lesson.type];
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [uploadingRecording, setUploadingRecording] = useState(false);
+  const [uploadingProgress, setUploadingProgress] = useState<number | null>(null);
+  const [optimizingVideo, setOptimizingVideo] = useState<
+    "recordedLiveVideoUrl" | "recordedVideoUrl" | null
+  >(null);
+  const [recordingPathInput, setRecordingPathInput] = useState("");
+  const [linkingRecordingPath, setLinkingRecordingPath] = useState(false);
+  const recordingInputRef = useRef<HTMLInputElement>(null);
 
   const handleDelete = () => {
     if (!confirmingDelete) {
@@ -2409,6 +2663,77 @@ function LessonDetailsModal({
       return;
     }
     onDelete(lesson._id);
+  };
+
+  const handleRecordingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingRecording(true);
+    setUploadingProgress(0);
+    try {
+      const res = await api.post(`/groups/${groupId}/lessons/upload-url`, {
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+      });
+      const { uploadUrl, fullPath } = res.data;
+
+      const uploaded = await uploadToUrlWithProgress(uploadUrl, file, setUploadingProgress);
+      if (!uploaded) throw new Error("فشل رفع الملف إلى التخزين");
+      setUploadingProgress(100);
+
+      await api.put(`/groups/${groupId}/lessons/${lesson._id}`, {
+        recordedLiveVideoUrl: fullPath as string,
+      });
+      toast.success("تم رفع تسجيل الحصة");
+      onLessonUpdated?.();
+    } catch (error) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || "فشل في رفع تسجيل الحصة");
+    } finally {
+      setUploadingRecording(false);
+      setUploadingProgress(null);
+      if (recordingInputRef.current) recordingInputRef.current.value = "";
+    }
+  };
+
+  const handleOptimizeVideo = async (
+    field: "recordedLiveVideoUrl" | "recordedVideoUrl"
+  ) => {
+    setOptimizingVideo(field);
+    try {
+      await api.post(`/groups/${groupId}/lessons/${lesson._id}/video/optimize`, {
+        field,
+      });
+      toast.success("تم تحسين الفيديو للتشغيل الفوري");
+      onLessonUpdated?.();
+    } catch (error) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || "فشل في تحسين الفيديو");
+    } finally {
+      setOptimizingVideo(null);
+    }
+  };
+
+  const handleLinkRecordingPath = async () => {
+    const value = recordingPathInput.trim();
+    if (!value) {
+      toast.error("أدخل مسار التسجيل أولاً");
+      return;
+    }
+    setLinkingRecordingPath(true);
+    try {
+      await api.put(`/groups/${groupId}/lessons/${lesson._id}`, {
+        recordedLiveVideoUrl: value,
+      });
+      toast.success("تم ربط تسجيل الحصة");
+      setRecordingPathInput("");
+      onLessonUpdated?.();
+    } catch (error) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || "فشل في ربط تسجيل الحصة");
+    } finally {
+      setLinkingRecordingPath(false);
+    }
   };
 
   return (
@@ -2500,13 +2825,218 @@ function LessonDetailsModal({
             </div>
           )}
 
+          {lesson.type === "LIVE" && (
+            <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs font-bold text-muted-foreground">تسجيل الحصة</p>
+                <button
+                  type="button"
+                  onClick={() => recordingInputRef.current?.click()}
+                  disabled={uploadingRecording}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-600 text-xs font-bold hover:bg-violet-500/20 transition-all disabled:opacity-60 disabled:pointer-events-none"
+                >
+                  {uploadingRecording ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      {uploadingProgress != null ? `جاري الرفع... ${uploadingProgress}%` : "جاري الرفع..."}
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      {lesson.recordedLiveVideoUrl ? "تحديث التسجيل" : "رفع تسجيل الحصة"}
+                    </>
+                  )}
+                </button>
+                <input
+                  ref={recordingInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleRecordingUpload}
+                  className="hidden"
+                />
+              </div>
+              {uploadingRecording && uploadingProgress != null && (
+                <div className="h-1.5 rounded-full bg-background border overflow-hidden">
+                  <div
+                    className="h-full bg-violet-500 transition-all duration-200"
+                    style={{ width: `${uploadingProgress}%` }}
+                  />
+                </div>
+              )}
+              <div className="flex flex-col gap-2 rounded-xl bg-background/60 border p-3">
+                <p className="text-[11px] font-bold text-muted-foreground">
+                  أو ألصق مسار التسجيل من أداة الرفع (يبدأ بـ lesson-videos/...)
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={recordingPathInput}
+                    onChange={(e) => setRecordingPathInput(e.target.value)}
+                    placeholder="lesson-videos/lessons/..."
+                    dir="ltr"
+                    className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-background border text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLinkRecordingPath}
+                    disabled={linkingRecordingPath}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/10 text-violet-600 text-xs font-bold hover:bg-violet-500/20 transition-all disabled:opacity-60 disabled:pointer-events-none shrink-0"
+                  >
+                    {linkingRecordingPath ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Link2 className="w-3.5 h-3.5" />
+                    )}
+                    ربط المسار
+                  </button>
+                </div>
+              </div>
+              {lesson.recordedLiveVideoUrl ? (
+                <div className="space-y-3">
+                  <VideoPlayer
+                    key={lesson.recordedLiveVideoUrl}
+                    src={lesson.recordedLiveVideoUrl}
+                    className="w-full max-h-72"
+                  />
+                  <a
+                    href={lesson.recordedLiveVideoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-violet-600 to-fuchsia-600 text-white text-sm font-bold shadow-lg shadow-violet-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300"
+                  >
+                    <Radio className="w-4 h-4" />
+                    فتح التسجيل في نافذة جديدة
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleOptimizeVideo("recordedLiveVideoUrl")}
+                    disabled={optimizingVideo === "recordedLiveVideoUrl"}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-600 text-xs font-bold hover:bg-violet-500/20 transition-all disabled:opacity-60 disabled:pointer-events-none"
+                  >
+                    {optimizingVideo === "recordedLiveVideoUrl" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5" />
+                    )}
+                    {optimizingVideo === "recordedLiveVideoUrl"
+                      ? "جاري التحسين..."
+                      : "تحسين التشغيل"}
+                  </button>
+                  <p className="text-[11px] text-muted-foreground">
+                    إذا كان التشغيل متأخراً، استخدم زر تحسين التشغيل لإعادة معالجة الفيديو ليبدأ فوراً.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  بعد انتهاء الجلسة المباشرة يمكنك رفع تسجيل الحصة هنا ليشاهده الطلاب.
+                </p>
+              )}
+            </div>
+          )}
+
+          {lesson.type === "LIVE" && lesson.recordedVideoUrl && (
+            <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
+              <p className="text-xs font-bold text-muted-foreground">فيديو إضافي</p>
+              <VideoPlayer
+                src={lesson.recordedVideoUrl}
+                className="w-full max-h-72"
+              />
+              <a
+                href={lesson.recordedVideoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-sm font-bold shadow-lg shadow-blue-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300"
+              >
+                <Radio className="w-4 h-4" />
+                فتح الفيديو في نافذة جديدة
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+              <button
+                type="button"
+                onClick={() => handleOptimizeVideo("recordedVideoUrl")}
+                disabled={optimizingVideo === "recordedVideoUrl"}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 text-xs font-bold hover:bg-blue-500/20 transition-all disabled:opacity-60 disabled:pointer-events-none"
+              >
+                {optimizingVideo === "recordedVideoUrl" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Zap className="w-3.5 h-3.5" />
+                )}
+                {optimizingVideo === "recordedVideoUrl"
+                  ? "جاري التحسين..."
+                  : "تحسين التشغيل"}
+              </button>
+            </div>
+          )}
+
+          {lesson.type === "LIVE" &&
+            Array.isArray(lesson.documents) &&
+            lesson.documents.length > 0 && (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                <p className="text-xs font-bold text-muted-foreground">
+                  المستندات ({lesson.documents.length})
+                </p>
+                <div className="space-y-2">
+                  {lesson.documents.map((doc, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background border"
+                    >
+                      <span className="text-xs text-muted-foreground truncate" dir="ltr">
+                        {doc}
+                      </span>
+                      <a
+                        href={doc}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-600 text-xs font-bold hover:bg-amber-500/20 transition-all"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        فتح
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {lesson.type === "LIVE" &&
+            Array.isArray(lesson.referenceLinks) &&
+            lesson.referenceLinks.length > 0 && (
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+                <p className="text-xs font-bold text-muted-foreground">
+                  الروابط المرجعية ({lesson.referenceLinks.length})
+                </p>
+                <div className="space-y-2">
+                  {lesson.referenceLinks.map((link, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background border"
+                    >
+                      <span className="text-xs text-muted-foreground truncate" dir="ltr">
+                        {link}
+                      </span>
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 text-xs font-bold hover:bg-emerald-500/20 transition-all"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        فتح
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           {lesson.type === "RECORDED" && lesson.videoUrl && (
             <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
               <p className="text-xs font-bold text-muted-foreground">فيديو الحصة المسجل</p>
-              <video
+              <VideoPlayer
                 src={lesson.videoUrl}
-                controls
-                className="w-full rounded-xl bg-black max-h-72"
+                className="w-full max-h-72"
               />
               <a
                 href={lesson.videoUrl}
