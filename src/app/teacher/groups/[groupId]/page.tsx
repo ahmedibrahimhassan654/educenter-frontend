@@ -1710,6 +1710,7 @@ function AddLessonModal({
   const [uploading, setUploading] = useState(false);
   const [uploadTarget, setUploadTarget] = useState<"video" | "document" | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [newlyUploadedVideo, setNewlyUploadedVideo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
@@ -1765,6 +1766,7 @@ function AddLessonModal({
     setDocumentInput("");
     setReferenceLinks([]);
     setReferenceLinkInput("");
+    setNewlyUploadedVideo(false);
     setStep(0);
     setDirection("forward");
   };
@@ -1834,8 +1836,10 @@ function AddLessonModal({
     setUploadTarget(target);
     try {
       const url = await uploadAttachment(file);
-      if (target === "video") setRecordedVideoUrl(url);
-      else setDocuments((prev) => [...prev, url]);
+      if (target === "video") {
+        setRecordedVideoUrl(url);
+        setNewlyUploadedVideo(true);
+      } else setDocuments((prev) => [...prev, url]);
       toast.success("تم رفع الملف بنجاح");
     } catch (error) {
       const axiosError = error as { response?: { data?: { message?: string } } };
@@ -1907,17 +1911,33 @@ function AddLessonModal({
         documents: docs,
         referenceLinks: links,
       };
+      let savedLessonId: string | undefined = editingLesson?._id;
       if (editingLesson) {
         await api.put(`/groups/${groupId}/lessons/${editingLesson._id}`, payload);
         toast.success("تم تحديث الدرس بنجاح");
       } else {
-        await api.post(`/groups/${groupId}/lessons`, payload);
+        const res = await api.post(`/groups/${groupId}/lessons`, payload);
+        savedLessonId = (res.data as { _id?: string })?._id || savedLessonId;
         toast.success("تمت إضافة الدرس بنجاح");
       }
       setShowModal(false);
       reset();
       onLessonAdded();
       if (editingLesson) onEditClosed?.();
+
+      // Videos uploaded through the app go straight to Supabase (no remux), so
+      // kick off the faststart optimization in the background automatically for
+      // an instant, smooth start.
+      if (newlyUploadedVideo && savedLessonId) {
+        toast.info("بدأ تحسين الفيديو تلقائياً ليتشغّل بسرعة...");
+        void api
+          .post(`/groups/${groupId}/lessons/${savedLessonId}/video/optimize`, {
+            field: "recordedVideoUrl",
+          })
+          .catch(() => {
+            // Optimization is best-effort; the video still streams fine without it.
+          });
+      }
     } catch (error) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       toast.error(axiosError.response?.data?.message || "فشل في حفظ الدرس");

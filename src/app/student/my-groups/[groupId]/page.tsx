@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import api, { clearCache } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import VideoPlayer from "@/components/video-player";
+import { OfflineVideoSection } from "@/components/offline-download";
 import { Group, Entitlement } from "@/types";
 import { getSubjectColor } from "@/lib/subject-colors";
 import { toast } from "sonner";
@@ -31,7 +32,6 @@ import {
   FileText,
   Link2,
   PlayCircle,
-  ExternalLink,
 } from "lucide-react";
 
 interface PurchasePayload {
@@ -506,8 +506,12 @@ export default function StudentGroupPage() {
                                   <p className="text-xs font-bold text-muted-foreground">
                                     تسجيل الحصة
                                   </p>
-                                  <VideoPlayer
-                                    src={lesson.recordedLiveVideoUrl}
+                                  <OfflineVideoSection
+                                    groupId={groupId}
+                                    lessonId={lesson._id}
+                                    field="recordedLiveVideoUrl"
+                                    url={lesson.recordedLiveVideoUrl}
+                                    title="تسجيل الحصة"
                                     className="w-full max-h-56"
                                   />
                                 </div>
@@ -517,8 +521,12 @@ export default function StudentGroupPage() {
                                   <p className="text-xs font-bold text-muted-foreground">
                                     فيديو إضافي
                                   </p>
-                                  <VideoPlayer
-                                    src={lesson.recordedVideoUrl}
+                                  <OfflineVideoSection
+                                    groupId={groupId}
+                                    lessonId={lesson._id}
+                                    field="recordedVideoUrl"
+                                    url={lesson.recordedVideoUrl}
+                                    title="فيديو إضافي"
                                     className="w-full max-h-56"
                                   />
                                 </div>

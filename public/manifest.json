@@ -2,8 +2,11 @@
   "name": "إديو سنتر",
   "short_name": "إديو سنتر",
   "description": "منصة إديو سنتر - أكبر منصة تعليمية في مصر",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#ffffff",
   "theme_color": "#4F46E5",
   "orientation": "portrait",
@@ -17,6 +20,12 @@
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["education"],

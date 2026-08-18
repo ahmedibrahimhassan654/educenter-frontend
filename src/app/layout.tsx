@@ -7,6 +7,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/next";
 import { JsonLd } from "@/components/json-ld";
+import ServiceWorkerRegister from "@/components/service-worker-register";
 import { generateOrganizationSchema, generateWebsiteSchema, SITE_CONFIG } from "@/lib/seo";
 
 const geistSans = localFont({
@@ -95,7 +96,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body
@@ -125,6 +126,7 @@ export default function RootLayout({
           </AuthProvider>
         </ThemeProvider>
         <Analytics />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
