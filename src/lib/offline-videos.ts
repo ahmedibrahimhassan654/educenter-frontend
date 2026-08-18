@@ -109,7 +109,9 @@ export async function downloadVideoToStorage(
   meta: Omit<StoredVideo, "key" | "blob" | "size" | "savedAt">,
   onProgress?: (progress: DownloadProgress) => void
 ): Promise<StoredVideo> {
-  const response = await fetch(url);
+  // Videos now stream through the authenticated proxy (login cookie required).
+  // Send the cookie on cross-origin API hosts too so downloads work offline.
+  const response = await fetch(url, { credentials: "include" });
   if (!response.ok) {
     throw new Error(`فشل تحميل الفيديو (${response.status})`);
   }

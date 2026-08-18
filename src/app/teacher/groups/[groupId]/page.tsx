@@ -8,6 +8,7 @@ import api, { clearCache } from "@/lib/api";
 import VideoPlayer from "@/components/video-player";
 import { Group } from "@/types";
 import { toast } from "sonner";
+import { lessonStarted } from "@/lib/lesson-time";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/user-avatar";
 import {
@@ -47,6 +48,7 @@ import {
   Package,
   Play,
   Zap,
+  Lock,
 } from "lucide-react";
 
 interface SuggestedStudent {
@@ -1652,6 +1654,20 @@ function normalizeReferenceLink(value: string): string {
   return `https://${v}`;
 }
 
+// True when a pasted link points outside this platform's storage (YouTube,
+// Google Drive, ...). Private lesson videos and documents must be uploaded
+// inside the app, so external links are rejected here and by the backend.
+function isExternalContentUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return false;
+  const lower = trimmed.toLowerCase();
+  return (
+    !lower.includes("/api/groups/") &&
+    !lower.includes("/api/sessions/") &&
+    !lower.includes("/storage/v1/object/")
+  );
+}
+
 function ReviewRow({
   label,
   value,
@@ -1707,9 +1723,10 @@ function AddLessonModal({
   const [documentInput, setDocumentInput] = useState("");
   const [referenceLinks, setReferenceLinks] = useState<string[]>([]);
   const [referenceLinkInput, setReferenceLinkInput] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadTarget, setUploadTarget] = useState<"video" | "document" | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<number | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [documentUploadProgress, setDocumentUploadProgress] = useState<number | null>(null);
   const [newlyUploadedVideo, setNewlyUploadedVideo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(0);
@@ -1803,9 +1820,13 @@ function AddLessonModal({
 
   const scheduledDate = nextDateFor(scheduleSlot);
 
-  const uploadAttachment = async (file: File) => {
-    setUploading(true);
-    setUploadProgress(0);
+  const uploadAttachment = async (
+    file: File,
+    setBusy: (v: boolean) => void,
+    setProgress: (p: number | null) => void
+  ) => {
+    setBusy(true);
+    setProgress(0);
     try {
       // The backend issues a signed upload URL; the file goes straight to
       // Supabase Storage so large recorded videos are not buffered by the API.
@@ -1815,15 +1836,14 @@ function AddLessonModal({
       });
       const { uploadUrl, fullPath } = res.data;
 
-      const uploaded = await uploadToUrlWithProgress(uploadUrl, file, setUploadProgress);
+      const uploaded = await uploadToUrlWithProgress(uploadUrl, file, setProgress);
       if (!uploaded) throw new Error("فشل رفع الملف إلى التخزين");
-      setUploadProgress(100);
+      setProgress(100);
 
       return fullPath as string;
     } finally {
-      setUploading(false);
-      setUploadTarget(null);
-      setUploadProgress(null);
+      setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -1833,9 +1853,11 @@ function AddLessonModal({
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadTarget(target);
     try {
-      const url = await uploadAttachment(file);
+      const url =
+        target === "video"
+          ? await uploadAttachment(file, setUploadingVideo, setVideoUploadProgress)
+          : await uploadAttachment(file, setUploadingDocument, setDocumentUploadProgress);
       if (target === "video") {
         setRecordedVideoUrl(url);
         setNewlyUploadedVideo(true);
@@ -1854,6 +1876,10 @@ function AddLessonModal({
   const addDocument = () => {
     const value = documentInput.trim();
     if (!value) return;
+    if (isExternalContentUrl(value)) {
+      toast.error("الروابط الخارجية غير مسموحة — ارفع الملف داخل المنصة");
+      return;
+    }
     if (documents.includes(value)) return;
     setDocuments((prev) => [...prev, value]);
     setDocumentInput("");
@@ -1882,6 +1908,11 @@ function AddLessonModal({
       // Flush anything still typed in the extra-files inputs so a link pasted
       // but not committed via "إضافة" is still saved with the lesson.
       const pendingDoc = documentInput.trim();
+      if (pendingDoc && isExternalContentUrl(pendingDoc)) {
+        toast.error("الروابط الخارجية للمستندات غير مسموحة — ارفع الملف داخل المنصة");
+        setSubmitting(false);
+        return;
+      }
       const docs =
         pendingDoc && !documents.includes(pendingDoc)
           ? [...documents, pendingDoc]
@@ -1963,6 +1994,10 @@ function AddLessonModal({
     }
     if (step === 2) {
       const pendingDoc = documentInput.trim();
+      if (pendingDoc && isExternalContentUrl(pendingDoc)) {
+        toast.error("الروابط الخارجية للمستندات غير مسموحة — ارفع الملف داخل المنصة");
+        return;
+      }
       if (pendingDoc && !documents.includes(pendingDoc)) {
         setDocuments((prev) => [...prev, pendingDoc]);
       }
@@ -2281,16 +2316,16 @@ function AddLessonModal({
                         <button
                           type="button"
                           onClick={() => recordedVideoInputRef.current?.click()}
-                          disabled={uploading && uploadTarget === "video"}
+                          disabled={uploadingVideo}
                           className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-sm font-bold shadow-lg shadow-blue-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
                         >
-                          {uploading && uploadTarget === "video" ? (
+                          {uploadingVideo ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
                             <Upload className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
                           )}
-                          {uploading && uploadTarget === "video" ? (
-                            uploadProgress != null ? `جاري الرفع... ${uploadProgress}%` : "جاري الرفع..."
+                          {uploadingVideo ? (
+                            videoUploadProgress != null ? `جاري الرفع... ${videoUploadProgress}%` : "جاري الرفع..."
                           ) : (
                             "رفع فيديو"
                           )}
@@ -2302,15 +2337,15 @@ function AddLessonModal({
                           </span>
                         )}
                       </div>
-                      {uploading && uploadTarget === "video" && uploadProgress != null && (
+                      {uploadingVideo && videoUploadProgress != null && (
                         <div className="h-1.5 rounded-full bg-background border overflow-hidden">
                           <div
                             className="h-full bg-blue-500 transition-all duration-200"
-                            style={{ width: `${uploadProgress}%` }}
+                            style={{ width: `${videoUploadProgress}%` }}
                           />
                         </div>
                       )}
-                      {uploading && uploadTarget === "video" && (
+                      {uploadingVideo && (
                         <p className="text-[11px] text-muted-foreground">
                           الفيديوهات الكبيرة قد تستغرق دقائق في الرفع — يبدأ التشغيل فوراً بعد التحسين.
                         </p>
@@ -2334,10 +2369,16 @@ function AddLessonModal({
                         <button
                           type="button"
                           onClick={() => {
-                            if (recordedVideoUrlInput.trim()) {
-                              setRecordedVideoUrl(recordedVideoUrlInput.trim());
-                              setRecordedVideoUrlInput("");
+                            const value = recordedVideoUrlInput.trim();
+                            if (!value) return;
+                            if (isExternalContentUrl(value)) {
+                              toast.error(
+                                "الروابط الخارجية غير مسموحة — ارفع الفيديو داخل المنصة"
+                              );
+                              return;
                             }
+                            setRecordedVideoUrl(value);
+                            setRecordedVideoUrlInput("");
                           }}
                           className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-500/10 text-blue-600 text-sm font-bold hover:bg-blue-500/20 transition-all"
                         >
@@ -2383,26 +2424,26 @@ function AddLessonModal({
                         <button
                           type="button"
                           onClick={() => documentInputRef.current?.click()}
-                          disabled={uploading && uploadTarget === "document"}
+                          disabled={uploadingDocument}
                           className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-amber-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
                         >
-                          {uploading && uploadTarget === "document" ? (
+                          {uploadingDocument ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
                             <Upload className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
                           )}
-                          {uploading && uploadTarget === "document" ? (
-                            uploadProgress != null ? `جاري الرفع... ${uploadProgress}%` : "جاري الرفع..."
+                          {uploadingDocument ? (
+                            documentUploadProgress != null ? `جاري الرفع... ${documentUploadProgress}%` : "جاري الرفع..."
                           ) : (
                             "رفع مستند"
                           )}
                         </button>
                       </div>
-                      {uploading && uploadTarget === "document" && uploadProgress != null && (
+                      {uploadingDocument && documentUploadProgress != null && (
                         <div className="h-1.5 rounded-full bg-background border overflow-hidden">
                           <div
                             className="h-full bg-amber-500 transition-all duration-200"
-                            style={{ width: `${uploadProgress}%` }}
+                            style={{ width: `${documentUploadProgress}%` }}
                           />
                         </div>
                       )}
@@ -2628,7 +2669,7 @@ function AddLessonModal({
               ) : (
                 <button
                   onClick={handleSubmit}
-                  disabled={submitting || uploading}
+                  disabled={submitting || uploadingVideo || uploadingDocument}
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-l from-emerald-600 via-teal-600 to-green-700 shadow-lg shadow-emerald-600/30 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-600/40 active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
                 >
                   {submitting ? (
@@ -2740,6 +2781,10 @@ function LessonDetailsModal({
       toast.error("أدخل مسار التسجيل أولاً");
       return;
     }
+    if (isExternalContentUrl(value)) {
+      toast.error("الروابط الخارجية غير مسموحة — ارفع التسجيل داخل المنصة");
+      return;
+    }
     setLinkingRecordingPath(true);
     try {
       await api.put(`/groups/${groupId}/lessons/${lesson._id}`, {
@@ -2847,69 +2892,78 @@ function LessonDetailsModal({
 
           {lesson.type === "LIVE" && (
             <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="text-xs font-bold text-muted-foreground">تسجيل الحصة</p>
-                <button
-                  type="button"
-                  onClick={() => recordingInputRef.current?.click()}
-                  disabled={uploadingRecording}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-600 text-xs font-bold hover:bg-violet-500/20 transition-all disabled:opacity-60 disabled:pointer-events-none"
-                >
-                  {uploadingRecording ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      {uploadingProgress != null ? `جاري الرفع... ${uploadingProgress}%` : "جاري الرفع..."}
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-3.5 h-3.5" />
-                      {lesson.recordedLiveVideoUrl ? "تحديث التسجيل" : "رفع تسجيل الحصة"}
-                    </>
+              {lessonStarted(lesson) ? (
+                <>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-xs font-bold text-muted-foreground">تسجيل الحصة</p>
+                    <button
+                      type="button"
+                      onClick={() => recordingInputRef.current?.click()}
+                      disabled={uploadingRecording}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-600 text-xs font-bold hover:bg-violet-500/20 transition-all disabled:opacity-60 disabled:pointer-events-none"
+                    >
+                      {uploadingRecording ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          {uploadingProgress != null ? `جاري الرفع... ${uploadingProgress}%` : "جاري الرفع..."}
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          {lesson.recordedLiveVideoUrl ? "تحديث التسجيل" : "رفع تسجيل الحصة"}
+                        </>
+                      )}
+                    </button>
+                    <input
+                      ref={recordingInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleRecordingUpload}
+                      className="hidden"
+                    />
+                  </div>
+                  {uploadingRecording && uploadingProgress != null && (
+                    <div className="h-1.5 rounded-full bg-background border overflow-hidden">
+                      <div
+                        className="h-full bg-violet-500 transition-all duration-200"
+                        style={{ width: `${uploadingProgress}%` }}
+                      />
+                    </div>
                   )}
-                </button>
-                <input
-                  ref={recordingInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={handleRecordingUpload}
-                  className="hidden"
-                />
-              </div>
-              {uploadingRecording && uploadingProgress != null && (
-                <div className="h-1.5 rounded-full bg-background border overflow-hidden">
-                  <div
-                    className="h-full bg-violet-500 transition-all duration-200"
-                    style={{ width: `${uploadingProgress}%` }}
-                  />
+                  <div className="flex flex-col gap-2 rounded-xl bg-background/60 border p-3">
+                    <p className="text-[11px] font-bold text-muted-foreground">
+                      أو ألصق مسار التسجيل من أداة الرفع (يبدأ بـ lesson-videos/...)
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={recordingPathInput}
+                        onChange={(e) => setRecordingPathInput(e.target.value)}
+                        placeholder="lesson-videos/lessons/..."
+                        dir="ltr"
+                        className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-background border text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleLinkRecordingPath}
+                        disabled={linkingRecordingPath}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/10 text-violet-600 text-xs font-bold hover:bg-violet-500/20 transition-all disabled:opacity-60 disabled:pointer-events-none shrink-0"
+                      >
+                        {linkingRecordingPath ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Link2 className="w-3.5 h-3.5" />
+                        )}
+                        ربط المسار
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                  <Lock className="w-3.5 h-3.5" />
+                  يُتاح رفع تسجيل الحصة بعد بدايتها.
                 </div>
               )}
-              <div className="flex flex-col gap-2 rounded-xl bg-background/60 border p-3">
-                <p className="text-[11px] font-bold text-muted-foreground">
-                  أو ألصق مسار التسجيل من أداة الرفع (يبدأ بـ lesson-videos/...)
-                </p>
-                <div className="flex items-center gap-2">
-                  <input
-                    value={recordingPathInput}
-                    onChange={(e) => setRecordingPathInput(e.target.value)}
-                    placeholder="lesson-videos/lessons/..."
-                    dir="ltr"
-                    className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-background border text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleLinkRecordingPath}
-                    disabled={linkingRecordingPath}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/10 text-violet-600 text-xs font-bold hover:bg-violet-500/20 transition-all disabled:opacity-60 disabled:pointer-events-none shrink-0"
-                  >
-                    {linkingRecordingPath ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Link2 className="w-3.5 h-3.5" />
-                    )}
-                    ربط المسار
-                  </button>
-                </div>
-              </div>
               {lesson.recordedLiveVideoUrl ? (
                 <div className="space-y-3">
                   <VideoPlayer
@@ -2946,11 +3000,11 @@ function LessonDetailsModal({
                     إذا كان التشغيل متأخراً، استخدم زر تحسين التشغيل لإعادة معالجة الفيديو ليبدأ فوراً.
                   </p>
                 </div>
-              ) : (
+              ) : lessonStarted(lesson) ? (
                 <p className="text-sm text-muted-foreground">
                   بعد انتهاء الجلسة المباشرة يمكنك رفع تسجيل الحصة هنا ليشاهده الطلاب.
                 </p>
-              )}
+              ) : null}
             </div>
           )}
 
