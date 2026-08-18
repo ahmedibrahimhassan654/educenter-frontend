@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api";
+import api, { clearCache } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { Group, Entitlement } from "@/types";
 import { getSubjectColor } from "@/lib/subject-colors";
@@ -26,12 +26,42 @@ import {
   CheckCircle2,
   Video,
   LogOut,
+  Radio,
+  FileText,
+  Link2,
+  PlayCircle,
+  ExternalLink,
 } from "lucide-react";
 
 interface PurchasePayload {
   type: "LECTURES" | "MONTHLY";
   lectures?: number;
 }
+
+interface StudentLesson {
+  _id: string;
+  title: string;
+  description?: string;
+  type: "LIVE" | "RECORDED" | "DOCUMENT" | "LINK";
+  meetingLink?: string;
+  videoUrl?: string;
+  documentUrl?: string;
+  referenceUrl?: string;
+  scheduleDay?: string;
+  scheduleTime?: string;
+  scheduledAt?: string;
+  createdAt: string;
+}
+
+const STUDENT_LESSON_META: Record<
+  StudentLesson["type"],
+  { label: string; Icon: typeof Video; badge: string }
+> = {
+  LIVE: { label: "درس مباشر", Icon: Video, badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
+  RECORDED: { label: "فيديو مسجل", Icon: Radio, badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  DOCUMENT: { label: "مستند", Icon: FileText, badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  LINK: { label: "رابط مرجعي", Icon: Link2, badge: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
+};
 
 export default function StudentGroupPage() {
   const params = useParams();
@@ -41,6 +71,9 @@ export default function StudentGroupPage() {
 
   const [group, setGroup] = useState<Group | null>(null);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [lessons, setLessons] = useState<StudentLesson[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(false);
+  const [lessonHasAccess, setLessonHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [selectedPack, setSelectedPack] = useState(4);
@@ -65,6 +98,25 @@ export default function StudentGroupPage() {
   useEffect(() => {
     fetchGroup();
   }, [fetchGroup]);
+
+  const fetchLessons = useCallback(async () => {
+    if (!groupId) return;
+    setLessonsLoading(true);
+    try {
+      clearCache(`/groups/${groupId}/lessons`);
+      const res = await api.get(`/groups/${groupId}/lessons`);
+      setLessons(res.data?.data || []);
+      setLessonHasAccess(res.data?.hasAccess ?? false);
+    } catch {
+      // ignore
+    } finally {
+      setLessonsLoading(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    fetchLessons();
+  }, [fetchLessons]);
 
   const handleLeave = async () => {
     setLeaving(true);
@@ -103,6 +155,10 @@ export default function StudentGroupPage() {
     } finally {
       setBuying(false);
     }
+  };
+
+  const scrollToBuy = () => {
+    document.getElementById("buy-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   if (loading) {
@@ -366,11 +422,145 @@ export default function StudentGroupPage() {
               </div>
             )}
           </div>
+
+          {/* Lessons */}
+          <div className="bg-card border rounded-2xl p-6">
+          <h3 className="font-cairo text-lg font-extrabold mb-4 flex items-center gap-2">
+            <span className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <BookOpen className="w-5 h-5 text-violet-500" />
+            </span>
+            دروس المجموعة
+          </h3>
+
+          {lessonsLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : lessons.length === 0 ? (
+            <div className="text-center py-10">
+              <p className="font-bold mb-1">لا توجد دروس بعد</p>
+              <p className="text-sm text-muted-foreground">
+                سيقوم المعلم بإضافة الدروس هنا قريباً
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {lessons.map((lesson) => {
+                const meta = STUDENT_LESSON_META[lesson.type];
+                return (
+                  <div
+                    key={lesson._id}
+                    className={`rounded-xl border p-4 ${
+                      lessonHasAccess ? "bg-background" : "bg-muted/40 border-dashed"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <meta.Icon className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold">{lesson.title}</h4>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}>
+                            {meta.label}
+                          </span>
+                        </div>
+
+                        {lessonHasAccess ? (
+                          <>
+                            {lesson.description && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {lesson.description}
+                              </p>
+                            )}
+                            <div className="mt-2 space-y-2">
+                              {lesson.type === "LIVE" && lesson.meetingLink && (
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    {lesson.scheduledAt
+                                      ? new Date(lesson.scheduledAt).toLocaleDateString("ar-EG", {
+                                          weekday: "long",
+                                          day: "numeric",
+                                          month: "long",
+                                        })
+                                      : lesson.scheduleDay}
+                                    {lesson.scheduleTime ? ` • ${lesson.scheduleTime}` : ""}
+                                  </span>
+                                  <a
+                                    href={lesson.meetingLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 transition-colors"
+                                  >
+                                    <Video className="w-3.5 h-3.5" />
+                                    انضمام للبث المباشر
+                                  </a>
+                                </div>
+                              )}
+                              {lesson.type === "RECORDED" && lesson.videoUrl && (
+                                <a
+                                  href={lesson.videoUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
+                                >
+                                  <PlayCircle className="w-3.5 h-3.5" />
+                                  مشاهدة الفيديو
+                                </a>
+                              )}
+                              {lesson.type === "DOCUMENT" && lesson.documentUrl && (
+                                <a
+                                  href={lesson.documentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  فتح المستند
+                                </a>
+                              )}
+                              {lesson.type === "LINK" && lesson.referenceUrl && (
+                                <a
+                                  href={lesson.referenceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
+                                >
+                                  <Link2 className="w-3.5 h-3.5" />
+                                  فتح الرابط المرجعي
+                                </a>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                            <Lock className="w-4 h-4 shrink-0" />
+                            المحتوى مقفل — اشترِ الحصص أو فعّل الاشتراك الشهري لفتحه
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {!lessonHasAccess && lessons.length > 0 && (
+            <button
+              onClick={scrollToBuy}
+              className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors"
+            >
+              <Lock className="w-4 h-4" />
+              اشترِ الحصص لفتح المحتوى
+            </button>
+          )}
+          </div>
         </div>
 
         {/* Sidebar: price + buy */}
         <aside className="h-fit lg:sticky lg:top-24 space-y-5">
-          <div className="bg-card border rounded-2xl p-6 shadow-sm">
+          <div id="buy-section" className="bg-card border rounded-2xl p-6 shadow-sm">
             <h3 className="font-cairo text-lg font-extrabold mb-4">
               اشترِ الحصص
             </h3>

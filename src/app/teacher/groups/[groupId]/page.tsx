@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import api, { clearCache } from "@/lib/api";
+import { getSupabase } from "@/lib/supabase";
 import { Group } from "@/types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,17 @@ import {
   Link2,
   Upload,
   Plus,
+  Eye,
+  Pencil,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  ClipboardCheck,
+  Layers,
+  Clock,
+  ExternalLink,
+  Package,
+  Play,
 } from "lucide-react";
 
 interface SuggestedStudent {
@@ -92,6 +104,7 @@ const LESSON_TYPE_META: Record<
     color: string;
     bg: string;
     badge: string;
+    gradient: string;
   }
 > = {
   LIVE: {
@@ -100,6 +113,7 @@ const LESSON_TYPE_META: Record<
     color: "text-rose-500",
     bg: "bg-rose-500/10",
     badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    gradient: "from-rose-500 via-red-500 to-rose-700",
   },
   RECORDED: {
     label: "فيديو مسجل",
@@ -107,6 +121,7 @@ const LESSON_TYPE_META: Record<
     color: "text-blue-500",
     bg: "bg-blue-500/10",
     badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    gradient: "from-blue-500 via-sky-500 to-indigo-700",
   },
   DOCUMENT: {
     label: "مستند",
@@ -114,6 +129,7 @@ const LESSON_TYPE_META: Record<
     color: "text-amber-500",
     bg: "bg-amber-500/10",
     badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    gradient: "from-amber-500 via-orange-500 to-yellow-600",
   },
   LINK: {
     label: "رابط مرجعي",
@@ -121,8 +137,16 @@ const LESSON_TYPE_META: Record<
     color: "text-emerald-500",
     bg: "bg-emerald-500/10",
     badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    gradient: "from-emerald-500 via-teal-500 to-cyan-700",
   },
 };
+
+const LESSON_STEPS = [
+  { label: "نوع الدرس", Icon: Layers, gradient: "from-violet-600 via-purple-600 to-fuchsia-700" },
+  { label: "العنوان والوصف", Icon: FileText, gradient: "from-blue-600 via-sky-600 to-cyan-700" },
+  { label: "محتوى الدرس", Icon: Package, gradient: "from-amber-500 via-orange-500 to-rose-600" },
+  { label: "المراجعة", Icon: ClipboardCheck, gradient: "from-emerald-600 via-teal-600 to-green-700" },
+];
 
 export default function GroupDetailPage() {
   const params = useParams();
@@ -145,6 +169,9 @@ export default function GroupDetailPage() {
   const [activeTab, setActiveTab] = useState<"info" | "students" | "lessons">("info");
   const [lessons, setLessons] = useState<LessonItem[]>([]);
   const [lessonsLoading, setLessonsLoading] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState<LessonItem | null>(null);
+  const [lessonToEdit, setLessonToEdit] = useState<LessonItem | null>(null);
+  const [confirmingLessonId, setConfirmingLessonId] = useState<string | null>(null);
 
   const groupId = params.groupId as string;
 
@@ -211,6 +238,14 @@ export default function GroupDetailPage() {
     };
     fetchSettings();
   }, [groupId, fetchGroup, fetchLessons]);
+
+  // Refresh the lessons list every time the lessons tab is opened, so a newly
+  // created lesson always shows up immediately.
+  useEffect(() => {
+    if (activeTab === "lessons" && groupId) {
+      fetchLessons();
+    }
+  }, [activeTab, groupId, fetchLessons]);
 
   const curriculumMap = new Map<string, { stage: string; grade: string; subject: string }>();
   for (const stage of curriculumTree) {
@@ -306,15 +341,27 @@ export default function GroupDetailPage() {
   };
 
   const handleDeleteLesson = async (lessonId: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الدرس؟")) return;
     try {
       await api.delete(`/groups/${groupId}/lessons/${lessonId}`);
       toast.success("تم حذف الدرس بنجاح");
       setLessons((prev) => prev.filter((l) => l._id !== lessonId));
+      setConfirmingLessonId(null);
     } catch (error) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       toast.error(axiosError.response?.data?.message || "فشل في حذف الدرس");
     }
+  };
+
+  const requestLessonDelete = (lessonId: string) => {
+    if (confirmingLessonId === lessonId) {
+      handleDeleteLesson(lessonId);
+      return;
+    }
+    setConfirmingLessonId(lessonId);
+    setTimeout(
+      () => setConfirmingLessonId((c) => (c === lessonId ? null : c)),
+      3000
+    );
   };
 
   const purchasesByStudent = useMemo(() => {
@@ -830,7 +877,14 @@ export default function GroupDetailPage() {
                 أضف دروساً مباشرة، فيديوهات مسجلة، مستندات، أو روابط مرجعية لطلابك
               </p>
             </div>
-            <AddLessonModal groupId={groupId} scheduleDays={group.scheduleDays || []} defaultMeetingLink={group.googleMeetLink || ""} onLessonAdded={fetchLessons} />
+            <AddLessonModal
+              groupId={groupId}
+              scheduleDays={group.scheduleDays || []}
+              defaultMeetingLink={group.googleMeetLink || ""}
+              onLessonAdded={fetchLessons}
+              editingLesson={lessonToEdit}
+              onEditClosed={() => setLessonToEdit(null)}
+            />
           </div>
 
           {lessonsLoading ? (
@@ -870,53 +924,83 @@ export default function GroupDetailPage() {
                 return (
                   <div
                     key={lesson._id}
-                    className="bg-card border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+                    className="group/lesson bg-card border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/30"
                   >
-                    <div className={`w-12 h-12 rounded-xl ${meta.bg} flex items-center justify-center shrink-0`}>
-                      <meta.Icon className={`w-6 h-6 ${meta.color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-lg font-bold truncate">{lesson.title}</h4>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}>
-                          {meta.label}
-                        </span>
+                    <button
+                      onClick={() => setSelectedLesson(lesson)}
+                      className="flex items-center gap-4 flex-1 min-w-0 text-right"
+                    >
+                      <div
+                        className={`w-12 h-12 rounded-xl ${meta.bg} flex items-center justify-center shrink-0 transition-transform duration-300 group-hover/lesson:scale-110`}
+                      >
+                        <meta.Icon className={`w-6 h-6 ${meta.color}`} />
                       </div>
-                      {lesson.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{lesson.description}</p>
-                      )}
-                      {lesson.type === "LIVE" && lesson.scheduledAt ? (
-                        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-primary">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {new Date(lesson.scheduledAt).toLocaleDateString("ar-EG", {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                          })}
-                          <span className="text-muted-foreground">•</span>
-                          {lesson.scheduleTime}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-lg font-bold truncate">{lesson.title}</h4>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}>
+                            {meta.label}
+                          </span>
                         </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground mt-1.5">
-                          {new Date(lesson.createdAt).toLocaleDateString("ar-EG")}
-                        </p>
-                      )}
-                    </div>
+                        {lesson.description && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{lesson.description}</p>
+                        )}
+                        {lesson.type === "LIVE" && lesson.scheduledAt ? (
+                          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-primary">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {new Date(lesson.scheduledAt).toLocaleDateString("ar-EG", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                            })}
+                            <span className="text-muted-foreground">•</span>
+                            {lesson.scheduleTime}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground mt-1.5">
+                            {new Date(lesson.createdAt).toLocaleDateString("ar-EG")}
+                          </p>
+                        )}
+                      </div>
+                    </button>
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setSelectedLesson(lesson)}
+                        className="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-all duration-300 hover:scale-110"
+                        title="عرض تفاصيل الدرس"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                       {href && (
                         <a
                           href={href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
                         >
                           <meta.Icon className="w-4 h-4" />
                           {actionLabel}
                         </a>
                       )}
                       <button
-                        onClick={() => handleDeleteLesson(lesson._id)}
-                        className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg text-muted-foreground transition-colors"
+                        onClick={() => setLessonToEdit(lesson)}
+                        className="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-all duration-300 hover:scale-110"
+                        title="تعديل الدرس"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => requestLessonDelete(lesson._id)}
+                        className={`p-2 rounded-lg text-muted-foreground transition-all duration-300 hover:scale-110 ${
+                          confirmingLessonId === lesson._id
+                            ? "bg-red-500/15 text-red-500 scale-110 animate-shake"
+                            : "hover:bg-red-500/10 hover:text-red-500"
+                        }`}
+                        title={
+                          confirmingLessonId === lesson._id
+                            ? "اضغط مرة أخرى للتأكيد"
+                            : "حذف الدرس"
+                        }
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -929,6 +1013,18 @@ export default function GroupDetailPage() {
         </div>
         )}
       </div>
+
+      {/* Lesson details modal */}
+      {selectedLesson && (
+        <LessonDetailsModal
+          lesson={selectedLesson}
+          onClose={() => setSelectedLesson(null)}
+          onDelete={(id) => {
+            handleDeleteLesson(id);
+            setSelectedLesson(null);
+          }}
+        />
+      )}
 
       {/* Delete Group Confirm Modal */}
       {showDeleteConfirm && (
@@ -1482,16 +1578,46 @@ function AddStudentModal({
   );
 }
 
+function ReviewRow({
+  label,
+  value,
+  dir,
+  multiline,
+}: {
+  label: string;
+  value?: string;
+  dir?: "ltr" | "rtl";
+  multiline?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold text-muted-foreground mb-1">{label}</p>
+      <p
+        dir={dir}
+        className={`${
+          multiline ? "text-sm leading-relaxed" : "text-sm font-medium break-all"
+        } px-3 py-2.5 rounded-xl bg-muted/60 border`}
+      >
+        {value || "—"}
+      </p>
+    </div>
+  );
+}
+
 function AddLessonModal({
   groupId,
   scheduleDays,
   defaultMeetingLink,
   onLessonAdded,
+  editingLesson,
+  onEditClosed,
 }: {
   groupId: string;
   scheduleDays: string[];
   defaultMeetingLink?: string;
   onLessonAdded: () => void;
+  editingLesson?: LessonItem | null;
+  onEditClosed?: () => void;
 }) {
   const [showModal, setShowModal] = useState(false);
   const [type, setType] = useState<LessonType>("LIVE");
@@ -1507,7 +1633,39 @@ function AddLessonModal({
   const [referenceUrl, setReferenceUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState<"forward" | "back">("forward");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingLesson) {
+      const l = editingLesson;
+      setType(l.type);
+      setTitle(l.title);
+      setDescription(l.description || "");
+      setMeetingLink(l.meetingLink || "");
+      setMeetingLinkMode(
+        l.meetingLink && defaultMeetingLink && l.meetingLink === defaultMeetingLink ? "group" : "custom"
+      );
+      setScheduleSlot(
+        l.scheduleDay && l.scheduleTime
+          ? `${l.scheduleDay} ${l.scheduleTime}`
+          : scheduleDays[0] || ""
+      );
+      setVideoUrl(l.videoUrl || "");
+      setDocumentUrl(l.documentUrl || "");
+      setReferenceUrl(l.referenceUrl || "");
+      setStep(0);
+      setDirection("forward");
+      setShowModal(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingLesson]);
+
+  const closeModal = () => {
+    setShowModal(false);
+    if (editingLesson) onEditClosed?.();
+  };
 
   const reset = () => {
     setTitle("");
@@ -1519,6 +1677,8 @@ function AddLessonModal({
     setDocumentUrl("");
     setReferenceUrl("");
     setType("LIVE");
+    setStep(0);
+    setDirection("forward");
   };
 
   const nextDateFor = (slot: string): string => {
@@ -1556,12 +1716,23 @@ function AddLessonModal({
   const uploadAttachment = async (file: File) => {
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await api.post(`/groups/${groupId}/lessons/upload`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      // The backend issues a signed upload URL; the file goes straight to
+      // Supabase Storage so large recorded videos are not buffered by the API.
+      const res = await api.post(`/groups/${groupId}/lessons/upload-url`, {
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
       });
-      return res.data.url as string;
+      const { bucket, path, token, fullPath } = res.data;
+
+      const supabase = getSupabase();
+      const { error } = await supabase.storage
+        .from(bucket)
+        .uploadToSignedUrl(path, token, file, {
+          contentType: file.type || "application/octet-stream",
+        });
+      if (error) throw error;
+
+      return fullPath as string;
     } finally {
       setUploading(false);
     }
@@ -1583,8 +1754,12 @@ function AddLessonModal({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const lessonVideoPreviewSrc = (raw: string) =>
+    raw.startsWith("http://") || raw.startsWith("https://")
+      ? raw
+      : `${process.env.NEXT_PUBLIC_API_URL || "/api"}/groups/${groupId}/lessons/video/preview?path=${encodeURIComponent(raw)}`;
+
+  const handleSubmit = async () => {
     setSubmitting(true);
     try {
       const liveSlot = scheduleSlot.match(/^(.+?)\s+(\d{1,2}:\d{2})/);
@@ -1592,7 +1767,7 @@ function AddLessonModal({
         type === "LIVE" && meetingLinkMode === "group"
           ? defaultMeetingLink || ""
           : meetingLink;
-      await api.post(`/groups/${groupId}/lessons`, {
+      const payload = {
         title,
         description,
         type,
@@ -1602,319 +1777,822 @@ function AddLessonModal({
         videoUrl: type === "RECORDED" ? videoUrl : undefined,
         documentUrl: type === "DOCUMENT" ? documentUrl : undefined,
         referenceUrl: type === "LINK" ? referenceUrl : undefined,
-      });
-      toast.success("تمت إضافة الدرس بنجاح");
+      };
+      if (editingLesson) {
+        await api.put(`/groups/${groupId}/lessons/${editingLesson._id}`, payload);
+        toast.success("تم تحديث الدرس بنجاح");
+      } else {
+        await api.post(`/groups/${groupId}/lessons`, payload);
+        toast.success("تمت إضافة الدرس بنجاح");
+      }
       setShowModal(false);
       reset();
       onLessonAdded();
+      if (editingLesson) onEditClosed?.();
     } catch (error) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || "فشل في إضافة الدرس");
+      toast.error(axiosError.response?.data?.message || "فشل في حفظ الدرس");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const goNext = () => {
+    if (step === 1 && !title.trim()) {
+      toast.error("أدخل عنوان الدرس أولاً");
+      return;
+    }
+    if (step === 2) {
+      if (type === "LIVE") {
+        if (scheduleDays.length > 0 && !scheduleSlot.trim()) {
+          toast.error("اختر يوم ووقت الحصة");
+          return;
+        }
+        if (meetingLinkMode === "custom" && !meetingLink.trim()) {
+          toast.error("أدخل رابط الاجتماع المباشر");
+          return;
+        }
+      } else if (type === "RECORDED" && !videoUrl.trim()) {
+        toast.error("أرفع فيديو الحصة المسجل أو ألصق رابطه");
+        return;
+      } else if (type === "DOCUMENT" && !documentUrl.trim()) {
+        toast.error("أرفع المستند أو ألصق رابطه");
+        return;
+      } else if (type === "LINK" && !referenceUrl.trim()) {
+        toast.error("أدخل الرابط المرجعي");
+        return;
+      }
+    }
+    setDirection("forward");
+    setStep((s) => Math.min(s + 1, LESSON_STEPS.length - 1));
+  };
+
+  const goBack = () => {
+    setDirection("back");
+    setStep((s) => Math.max(s - 1, 0));
+  };
+
+  const typeMeta = LESSON_TYPE_META[type];
+  const StepIcon = LESSON_STEPS[step].Icon;
+
   return (
     <>
       <button
-        onClick={() => setShowModal(true)}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+        onClick={() => {
+          reset();
+          setShowModal(true);
+        }}
+        className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-l from-violet-600 via-fuchsia-600 to-indigo-700 shadow-lg shadow-fuchsia-600/25 hover:shadow-xl hover:shadow-fuchsia-600/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300"
       >
-        <Plus className="w-4 h-4" />
+        <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" />
         إضافة درس
       </button>
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowModal(false)}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+            onClick={closeModal}
           />
-          <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-background p-6 border-b z-10">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold">إضافة درس جديد</h3>
+          <div className="relative w-full max-w-xl max-h-[92vh] overflow-hidden rounded-3xl bg-background border shadow-2xl animate-in zoom-in-95 duration-300">
+            <div
+              className={`relative bg-gradient-to-l ${LESSON_STEPS[step].gradient} px-6 pt-5 pb-6 text-white`}
+            >
+              <div
+                className="absolute inset-0 opacity-20"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.4) 1px, transparent 0)",
+                  backgroundSize: "20px 20px",
+                }}
+              />
+              <div className="relative flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+<div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-inner shrink-0">
+                      <StepIcon className="w-5 h-5" />
+                    </div>
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-extrabold leading-tight">
+                      {editingLesson ? "تعديل الدرس" : "إضافة درس جديد"}
+                    </h3>
+                    <p className="text-[11px] text-white/85 font-semibold">
+                      الخطوة {step + 1} من {LESSON_STEPS.length} • {LESSON_STEPS[step].label}
+                    </p>
+                  </div>
+                </div>
                 <button
-                  onClick={() => setShowModal(false)}
-                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                  onClick={closeModal}
+                  className="p-2 rounded-xl bg-white/15 hover:bg-white/30 hover:rotate-90 transition-all duration-300"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                {(Object.keys(LESSON_TYPE_META) as LessonType[]).map((t) => {
-                  const meta = LESSON_TYPE_META[t];
+              <div className="relative mt-5 flex items-start">
+                {LESSON_STEPS.map((s, i) => {
+                  const done = i < step;
+                  const active = i === step;
                   return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setType(t)}
-                      className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-right ${
-                        type === t
-                          ? "bg-primary/10 border border-primary/40 text-primary"
-                          : "bg-muted hover:bg-muted/80 border border-transparent"
-                      }`}
-                    >
-                      <meta.Icon className="w-4 h-4 shrink-0" />
-                      {meta.label}
-                    </button>
+                    <Fragment key={s.label}>
+                      <div className="flex flex-col items-center flex-1">
+                        <div
+                          className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-all duration-500 ${
+                            done
+                              ? "bg-white text-fuchsia-700"
+                              : active
+                              ? "bg-white scale-110 shadow-lg shadow-black/20 text-fuchsia-700"
+                              : "bg-white/20 text-white/70"
+                          }`}
+                        >
+                          {done ? (
+                            <Check className="w-4 h-4" />
+                          ) : (
+                            <s.Icon className="w-4 h-4" />
+                          )}
+                          {active && (
+                            <span className="absolute -inset-2 rounded-full bg-white/30 animate-ping" />
+                          )}
+                        </div>
+                        <span
+                          className={`mt-1.5 text-[10px] font-bold ${
+                            done || active ? "text-white" : "text-white/60"
+                          }`}
+                        >
+                          {s.label}
+                        </span>
+                      </div>
+                      {i < LESSON_STEPS.length - 1 && (
+                        <div
+                          className={`h-0.5 flex-1 self-start mt-4 rounded-full transition-colors duration-500 ${
+                            done ? "bg-white/90" : "bg-white/25"
+                          }`}
+                        />
+                      )}
+                    </Fragment>
                   );
                 })}
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">عنوان الدرس</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: حل تمارين الوحدة الأولى"
-                  required
-                  className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">الوصف (اختياري)</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="نبذة مختصرة عن الدرس..."
-                  rows={2}
-                  className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              {type === "LIVE" && (
-                <>
+            <div className="max-h-[calc(92vh-16rem)] overflow-y-auto px-6 py-6">
+              <div
+                key={step}
+                className={`animate-in fade-in duration-400 ${
+                  direction === "forward"
+                    ? "slide-in-from-right-8"
+                    : "slide-in-from-left-8"
+                }`}
+              >
+                {step === 0 && (
                   <div>
-                    <label className="block text-sm font-medium mb-2">يوم ووقت الحصة (من جدول المجموعة)</label>
-                    {scheduleDays.length > 0 ? (
-                      <>
-                        <select
-                          value={scheduleSlot}
-                          onChange={(e) => setScheduleSlot(e.target.value)}
-                          required
-                          className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                          {scheduleDays.map((slot) => (
-                            <option key={slot} value={slot}>
-                              {slot}
-                            </option>
-                          ))}
-                        </select>
-                        {scheduledDate && (
-                          <div className="mt-3 p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm">
-                            <span className="font-semibold text-primary">الموعد التلقائي:</span>{" "}
-                            <span className="font-bold">{scheduledDate}</span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400">
-                        لا توجد مواعيد محددة لجدول المجموعة. أضف مواعيد الحصص أولاً من معلومات المجموعة.
-                      </div>
-                    )}
+                    <p className="text-sm text-muted-foreground mb-4">
+                      اختر نوع الدرس الذي تريد إضافته لطلابك
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(Object.keys(LESSON_TYPE_META) as LessonType[]).map((t) => {
+                        const m = LESSON_TYPE_META[t];
+                        const active = type === t;
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setType(t)}
+                            className={`relative group/type overflow-hidden p-4 rounded-2xl border text-right transition-all duration-300 ${
+                              active
+                                ? "border-transparent ring-2 ring-offset-2 ring-primary shadow-lg"
+                                : "bg-card border-border hover:-translate-y-0.5 hover:shadow-md"
+                            }`}
+                          >
+                            <div
+                              className={`absolute inset-0 opacity-10 transition-opacity duration-300 ${
+                                active ? "opacity-100" : "opacity-0 group-hover/type:opacity-60"
+                              } bg-gradient-to-br ${m.gradient}`}
+                            />
+                            <div className="relative flex items-start gap-3">
+                              <div
+                                className={`w-12 h-12 rounded-xl ${m.bg} flex items-center justify-center shrink-0 transition-transform duration-300 ${
+                                  active ? "scale-110" : "group-hover/type:scale-110"
+                                }`}
+                              >
+                                <m.Icon className={`w-6 h-6 ${m.color}`} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-sm">{m.label}</p>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                  {t === "LIVE" && "بث مباشر مع الطلاب وفق جدول المجموعة"}
+                                  {t === "RECORDED" && "فيديو مسجل للحصة يطلع عليه الطلاب"}
+                                  {t === "DOCUMENT" && "ملف مرفق مثل PDF أو عروض تقديمية"}
+                                  {t === "LINK" && "رابط مرجعي خارجي للطلاب"}
+                                </p>
+                              </div>
+                              {active && (
+                                <span className="absolute top-3 left-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center animate-scale-in">
+                                  <Check className="w-3.5 h-3.5" />
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-sm font-medium mb-2">رابط الاجتماع المباشر</label>
-                    {defaultMeetingLink ? (
-                      <div className="space-y-2">
-                        <button
-                          type="button"
-                          onClick={() => setMeetingLinkMode("group")}
-                          className={`w-full flex items-start gap-3 p-3 rounded-lg border text-right transition-colors ${
-                            meetingLinkMode === "group"
-                              ? "bg-primary/10 border-primary/40"
-                              : "bg-muted/50 border-border hover:bg-muted/80"
-                          }`}
-                        >
-                          <span
-                            className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              meetingLinkMode === "group" ? "border-primary" : "border-muted-foreground"
-                            }`}
-                          >
-                            {meetingLinkMode === "group" && <span className="w-2 h-2 rounded-full bg-primary" />}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-sm font-medium">استخدام رابط المجموعة</span>
-                            <span className="block text-xs text-muted-foreground truncate mt-0.5" dir="ltr">
-                              {defaultMeetingLink}
-                            </span>
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMeetingLinkMode("custom")}
-                          className={`w-full flex items-start gap-3 p-3 rounded-lg border text-right transition-colors ${
-                            meetingLinkMode === "custom"
-                              ? "bg-primary/10 border-primary/40"
-                              : "bg-muted/50 border-border hover:bg-muted/80"
-                          }`}
-                        >
-                          <span
-                            className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              meetingLinkMode === "custom" ? "border-primary" : "border-muted-foreground"
-                            }`}
-                          >
-                            {meetingLinkMode === "custom" && <span className="w-2 h-2 rounded-full bg-primary" />}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-sm font-medium">إضافة رابط اجتماع جديد</span>
-                          </span>
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="mb-3 text-xs text-muted-foreground">
-                        لم يتم تحديد رابط اجتماع للمجموعة، أدخل رابطاً جديداً للحصة:
-                      </p>
-                    )}
-
-                    {meetingLinkMode === "custom" && (
+                {step === 1 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                          <FileText className="w-4 h-4" />
+                        </span>
+                        عنوان الدرس
+                      </label>
                       <input
-                        type="url"
-                        value={meetingLink}
-                        onChange={(e) => setMeetingLink(e.target.value)}
-                        placeholder="https://meet.google.com/xxx-xxxx-xxx"
-                        required
-                        dir="ltr"
-                        className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="مثال: حل تمارين الوحدة الأولى"
+                        className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-400 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-violet-500/10 text-violet-600 flex items-center justify-center">
+                          <Info className="w-4 h-4" />
+                        </span>
+                        الوصف (اختياري)
+                      </label>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="نبذة مختصرة عن الدرس..."
+                        rows={3}
+                        className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-violet-500/60 focus:border-violet-400 transition-all resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {step === 2 && type === "LIVE" && (
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border-t-4 border-rose-500/50 bg-rose-500/5 p-4">
+                      <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center">
+                          <Calendar className="w-4 h-4" />
+                        </span>
+                        يوم ووقت الحصة (من جدول المجموعة)
+                      </label>
+                      {scheduleDays.length > 0 ? (
+                        <>
+                          <select
+                            value={scheduleSlot}
+                            onChange={(e) => setScheduleSlot(e.target.value)}
+                            className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-rose-500/60 focus:border-rose-400 transition-all"
+                          >
+                            {scheduleDays.map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                          </select>
+                          {scheduledDate && (
+                            <div className="mt-3 flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-sm animate-fade-in">
+                              <Calendar className="w-4 h-4 text-rose-500" />
+                              <span className="font-semibold text-rose-600 dark:text-rose-400">
+                                الموعد التلقائي:
+                              </span>
+                              <span className="font-bold">{scheduledDate}</span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400">
+                          لا توجد مواعيد محددة لجدول المجموعة. أضف مواعيد الحصص أولاً من معلومات المجموعة.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-2xl border-t-4 border-rose-500/50 bg-rose-500/5 p-4">
+                      <label className="block text-sm font-semibold mb-3 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center">
+                          <Video className="w-4 h-4" />
+                        </span>
+                        رابط الاجتماع المباشر
+                      </label>
+                      {defaultMeetingLink ? (
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setMeetingLinkMode("group")}
+                            className={`w-full flex items-start gap-3 p-3 rounded-xl border text-right transition-all duration-300 ${
+                              meetingLinkMode === "group"
+                                ? "bg-rose-500/10 border-rose-400/60 shadow-sm"
+                                : "bg-muted/50 border-border hover:bg-muted/80"
+                            }`}
+                          >
+                            <span
+                              className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                meetingLinkMode === "group"
+                                  ? "border-rose-500"
+                                  : "border-muted-foreground"
+                              }`}
+                            >
+                              {meetingLinkMode === "group" && (
+                                <span className="w-2 h-2 rounded-full bg-rose-500" />
+                              )}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium">استخدام رابط المجموعة</span>
+                              <span className="block text-xs text-muted-foreground truncate mt-0.5" dir="ltr">
+                                {defaultMeetingLink}
+                              </span>
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMeetingLinkMode("custom")}
+                            className={`w-full flex items-start gap-3 p-3 rounded-xl border text-right transition-all duration-300 ${
+                              meetingLinkMode === "custom"
+                                ? "bg-rose-500/10 border-rose-400/60 shadow-sm"
+                                : "bg-muted/50 border-border hover:bg-muted/80"
+                            }`}
+                          >
+                            <span
+                              className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                meetingLinkMode === "custom"
+                                  ? "border-rose-500"
+                                  : "border-muted-foreground"
+                              }`}
+                            >
+                              {meetingLinkMode === "custom" && (
+                                <span className="w-2 h-2 rounded-full bg-rose-500" />
+                              )}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium">إضافة رابط اجتماع جديد</span>
+                            </span>
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="mb-3 text-xs text-muted-foreground">
+                          لم يتم تحديد رابط اجتماع للمجموعة، أدخل رابطاً جديداً للحصة:
+                        </p>
+                      )}
+
+                      {meetingLinkMode === "custom" && (
+                        <input
+                          type="url"
+                          value={meetingLink}
+                          onChange={(e) => setMeetingLink(e.target.value)}
+                          placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                          dir="ltr"
+                          className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-rose-500/60 focus:border-rose-400 transition-all"
+                        />
+                      )}
+                      {meetingLinkMode === "group" && defaultMeetingLink && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          سيستخدم الطلاب رابط المجموعة للانضمام للبث المباشر
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              {step === 2 && type === "RECORDED" && (
+                  <div className="rounded-2xl border-t-4 border-blue-500/50 bg-blue-500/5 p-4 space-y-4">
+                    <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                        <Radio className="w-4 h-4" />
+                      </span>
+                      فيديو الحصة المسجل
+                    </label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-sm font-bold shadow-lg shadow-blue-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            جاري الرفع...
+                          </>
+                        ) : (
+                          <Upload className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
+                        )}
+                        {!uploading && "رفع فيديو"}
+                      </button>
+                      {videoUrl && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-semibold animate-scale-in">
+                          <Check className="w-3.5 h-3.5" />
+                          تم رفع الفيديو
+                        </span>
+                      )}
+                    </div>
+                    {videoUrl && (
+                      <video
+                        key={videoUrl}
+                        src={lessonVideoPreviewSrc(videoUrl)}
+                        controls
+                        className="w-full rounded-xl bg-black max-h-64 animate-fade-in"
                       />
                     )}
-                    {meetingLinkMode === "group" && defaultMeetingLink && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        سيستخدم الطلاب رابط المجموعة للانضمام للبث المباشر
-                      </p>
-                    )}
+                    <input
+                      type="text"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      placeholder="أو الصق رابط الفيديو هنا"
+                      dir="ltr"
+                      className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-400 transition-all"
+                    />
                   </div>
-                </>
-              )}
-
-              {type === "RECORDED" && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">فيديو الحصة المسجل</label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="video/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-background border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
-                    >
-                      {uploading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Upload className="w-4 h-4" />
-                      )}
-                      رفع فيديو
-                    </button>
-                    {videoUrl && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-medium">
-                        <Check className="w-3.5 h-3.5" />
-                        تم رفع الفيديو
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="url"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="أو الصق رابط الفيديو هنا"
-                    dir="ltr"
-                    className="w-full px-4 py-3 mt-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              )}
-
-              {type === "DOCUMENT" && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">ملف المستند</label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.png,.jpg,.jpeg"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-background border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
-                    >
-                      {uploading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Upload className="w-4 h-4" />
-                      )}
-                      رفع مستند
-                    </button>
-                    {documentUrl && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-medium">
-                        <Check className="w-3.5 h-3.5" />
-                        تم رفع المستند
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="url"
-                    value={documentUrl}
-                    onChange={(e) => setDocumentUrl(e.target.value)}
-                    placeholder="أو الصق رابط الملف هنا"
-                    dir="ltr"
-                    className="w-full px-4 py-3 mt-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              )}
-
-              {type === "LINK" && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">الرابط المرجعي</label>
-                  <input
-                    type="url"
-                    value={referenceUrl}
-                    onChange={(e) => setReferenceUrl(e.target.value)}
-                    placeholder="https://example.com/ref"
-                    required
-                    dir="ltr"
-                    className="w-full px-4 py-3 bg-background border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    مصدر أو مرجع إضافي يمكن للطلاب فتحه
-                  </p>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={submitting || uploading}
-                className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin ml-2 inline" />
-                    جاري الإضافة...
-                  </>
-                ) : (
-                  "إضافة الدرس"
                 )}
+
+                {step === 2 && type === "DOCUMENT" && (
+                  <div className="rounded-2xl border-t-4 border-amber-500/50 bg-amber-500/5 p-4 space-y-4">
+                    <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                        <FileText className="w-4 h-4" />
+                      </span>
+                      ملف المستند
+                    </label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.png,.jpg,.jpeg"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-amber-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            جاري الرفع...
+                          </>
+                        ) : (
+                          <Upload className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
+                        )}
+                        {!uploading && "رفع مستند"}
+                      </button>
+                      {documentUrl && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-semibold animate-scale-in">
+                          <Check className="w-3.5 h-3.5" />
+                          تم رفع المستند
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={documentUrl}
+                      onChange={(e) => setDocumentUrl(e.target.value)}
+                      placeholder="أو الصق رابط الملف هنا"
+                      dir="ltr"
+                      className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-amber-500/60 focus:border-amber-400 transition-all"
+                    />
+                  </div>
+                )}
+
+                {step === 2 && type === "LINK" && (
+                  <div className="rounded-2xl border-t-4 border-emerald-500/50 bg-emerald-500/5 p-4 space-y-3">
+                    <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                        <Link2 className="w-4 h-4" />
+                      </span>
+                      الرابط المرجعي
+                    </label>
+                    <input
+                      type="url"
+                      value={referenceUrl}
+                      onChange={(e) => setReferenceUrl(e.target.value)}
+                      placeholder="https://example.com/ref"
+                      dir="ltr"
+                      className="w-full px-4 py-3 bg-background border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-400 transition-all"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      مصدر أو مرجع إضافي يمكن للطلاب فتحه
+                    </p>
+                  </div>
+                )}
+
+                {step === 3 && (
+                  <div className="space-y-4">
+                    <div className="overflow-hidden rounded-2xl border animate-fade-in">
+                      <div
+                        className={`bg-gradient-to-l ${typeMeta.gradient} px-5 py-4 text-white flex items-center gap-3`}
+                      >
+                        <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+                          <typeMeta.Icon className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-white/80 font-semibold">نوع الدرس</p>
+                          <p className="font-extrabold">{typeMeta.label}</p>
+                        </div>
+                        <span className="mr-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-xs font-bold">
+                          <Check className="w-3.5 h-3.5" />
+                          جاهز
+                        </span>
+                      </div>
+                      <div className="p-5 space-y-3 bg-card">
+                        <ReviewRow label="عنوان الدرس" value={title} />
+                        {description && (
+                          <ReviewRow label="الوصف" value={description} multiline />
+                        )}
+                        {type === "LIVE" && (
+                          <>
+                            <ReviewRow
+                              label="الموعد"
+                              value={`${scheduleSlot}${
+                                scheduledDate ? ` (الموعد التلقائي: ${scheduledDate})` : ""
+                              }`}
+                            />
+                            <ReviewRow
+                              label="رابط الاجتماع"
+                              value={meetingLinkMode === "group" ? defaultMeetingLink || "" : meetingLink}
+                              dir="ltr"
+                            />
+                          </>
+                        )}
+                        {type === "RECORDED" && videoUrl && (
+                          <ReviewRow label="فيديو الحصة المسجل" value={videoUrl} dir="ltr" />
+                        )}
+                        {type === "DOCUMENT" && documentUrl && (
+                          <ReviewRow label="المستند" value={documentUrl} dir="ltr" />
+                        )}
+                        {type === "LINK" && referenceUrl && (
+                          <ReviewRow label="الرابط المرجعي" value={referenceUrl} dir="ltr" />
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-center text-xs text-muted-foreground animate-fade-in">
+                      راجع بيانات الدرس ثم اضغط على زر الحفظ
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t bg-muted/40">
+              <button
+                onClick={goBack}
+                disabled={step === 0}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-300 disabled:opacity-40 disabled:pointer-events-none hover:bg-muted"
+              >
+                <ChevronRight className="w-4 h-4" />
+                السابق
               </button>
-            </form>
+
+              {step < LESSON_STEPS.length - 1 ? (
+                <button
+                  onClick={goNext}
+                  className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-l ${LESSON_STEPS[step + 1].gradient} shadow-lg hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300`}
+                >
+                  التالي
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || uploading}
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-l from-emerald-600 via-teal-600 to-green-700 shadow-lg shadow-emerald-600/30 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-600/40 active:translate-y-0 transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {editingLesson ? "جاري الحفظ..." : "جاري الإضافة..."}
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      {editingLesson ? "حفظ التعديلات" : "إضافة الدرس"}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
     </>
+  );
+}
+
+function LessonDetailsModal({
+  lesson,
+  onClose,
+  onDelete,
+}: {
+  lesson: LessonItem;
+  onClose: () => void;
+  onDelete: (id: string) => void;
+}) {
+  const meta = LESSON_TYPE_META[lesson.type];
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const handleDelete = () => {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      setTimeout(() => setConfirmingDelete(false), 3000);
+      return;
+    }
+    onDelete(lesson._id);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-xl max-h-[92vh] overflow-hidden rounded-3xl bg-background border shadow-2xl animate-in zoom-in-95 duration-300">
+        <div className={`relative bg-gradient-to-br ${meta.gradient} px-6 py-7 text-white`}>
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.4) 1px, transparent 0)",
+              backgroundSize: "22px 22px",
+            }}
+          />
+          <button
+            onClick={onClose}
+            className="absolute top-4 left-4 p-2 rounded-xl bg-white/15 hover:bg-white/30 hover:rotate-90 transition-all duration-300"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div className="relative flex items-start gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-inner shrink-0 animate-scale-in">
+              <meta.Icon className="w-8 h-8" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur text-xs font-bold">
+                {meta.label}
+              </span>
+              <h3 className="text-2xl font-extrabold mt-2 leading-tight break-words">
+                {lesson.title}
+              </h3>
+            </div>
+          </div>
+          {lesson.description && (
+            <p className="relative mt-4 text-sm text-white/90 leading-relaxed animate-fade-in">
+              {lesson.description}
+            </p>
+          )}
+          <div className="relative mt-4 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 backdrop-blur text-xs font-bold">
+              <Calendar className="w-3.5 h-3.5" />
+              أُضيف {new Date(lesson.createdAt).toLocaleDateString("ar-EG")}
+            </span>
+            {lesson.type === "LIVE" && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 backdrop-blur text-xs font-bold">
+                <Clock className="w-3.5 h-3.5" />
+                {lesson.scheduleDay}
+                {lesson.scheduleTime ? ` • ${lesson.scheduleTime}` : ""}
+              </span>
+            )}
+            {lesson.type === "LIVE" && lesson.scheduledAt && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 backdrop-blur text-xs font-bold">
+                <Play className="w-3.5 h-3.5" />
+                الموعد التلقائي:{" "}
+                {new Date(lesson.scheduledAt).toLocaleDateString("ar-EG", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="max-h-[calc(92vh-19rem)] overflow-y-auto p-6 space-y-5">
+          {lesson.type === "LIVE" && lesson.meetingLink && (
+            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-4 space-y-3">
+              <p className="text-xs font-bold text-muted-foreground">رابط الاجتماع المباشر</p>
+              <p
+                className="text-sm break-all bg-background border rounded-xl px-3 py-2.5"
+                dir="ltr"
+              >
+                {lesson.meetingLink}
+              </p>
+              <a
+                href={lesson.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-rose-600 to-red-600 text-white text-sm font-bold shadow-lg shadow-rose-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300"
+              >
+                <Video className="w-4 h-4" />
+                انضمام للبث المباشر
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          )}
+
+          {lesson.type === "RECORDED" && lesson.videoUrl && (
+            <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
+              <p className="text-xs font-bold text-muted-foreground">فيديو الحصة المسجل</p>
+              <video
+                src={lesson.videoUrl}
+                controls
+                className="w-full rounded-xl bg-black max-h-72"
+              />
+              <a
+                href={lesson.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-sm font-bold shadow-lg shadow-blue-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300"
+              >
+                <Radio className="w-4 h-4" />
+                فتح الفيديو في نافذة جديدة
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          )}
+
+          {lesson.type === "DOCUMENT" && lesson.documentUrl && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+              <p className="text-xs font-bold text-muted-foreground">المستند</p>
+              <p
+                className="text-sm break-all bg-background border rounded-xl px-3 py-2.5"
+                dir="ltr"
+              >
+                {lesson.documentUrl}
+              </p>
+              <a
+                href={lesson.documentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-amber-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300"
+              >
+                <FileText className="w-4 h-4" />
+                فتح / تحميل المستند
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          )}
+
+          {lesson.type === "LINK" && lesson.referenceUrl && (
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+              <p className="text-xs font-bold text-muted-foreground">الرابط المرجعي</p>
+              <p
+                className="text-sm break-all bg-background border rounded-xl px-3 py-2.5"
+                dir="ltr"
+              >
+                {lesson.referenceUrl}
+              </p>
+              <a
+                href={lesson.referenceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-emerald-600 to-teal-600 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300"
+              >
+                <Link2 className="w-4 h-4" />
+                فتح الرابط المرجعي
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-4 border-t">
+            <button
+              onClick={onClose}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border hover:bg-muted transition-colors"
+            >
+              إغلاق
+            </button>
+            <button
+              onClick={handleDelete}
+              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-l from-red-600 to-rose-600 shadow-lg shadow-red-600/25 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all duration-300 ${
+                confirmingDelete ? "animate-shake" : ""
+              }`}
+            >
+              {confirmingDelete ? (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  اضغط للتأكيد
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  حذف الدرس
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
