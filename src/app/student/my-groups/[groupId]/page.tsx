@@ -10,7 +10,7 @@ import VideoPlayer from "@/components/video-player";
 import { OfflineVideoSection } from "@/components/offline-download";
 import { Group, Entitlement } from "@/types";
 import { getSubjectColor } from "@/lib/subject-colors";
-import { canJoinLive, LIVE_JOIN_WINDOW_MS } from "@/lib/lesson-time";
+import { canJoinLive } from "@/lib/lesson-time";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -325,20 +325,6 @@ export default function StudentGroupPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // The live-lesson banner shows the next live lesson: the soonest one whose
-  // join window is open or upcoming, falling back to unscheduled (always open)
-  // lessons, then null when there is nothing to show.
-  const nextLiveLesson = useMemo(() => {
-    const live = sortedLessons.filter((l) => l.type === "LIVE");
-    const withTime = live.filter((l) => l.scheduledAt);
-    const fromNow = withTime.find(
-      (l) =>
-        new Date(l.scheduledAt!).getTime() >= Date.now() - LIVE_JOIN_WINDOW_MS
-    );
-    if (fromNow) return fromNow;
-    return live.find((l) => !l.scheduledAt) || null;
-  }, [sortedLessons]);
-
   const handleLeave = async () => {
     setLeaving(true);
     try {
@@ -599,98 +585,6 @@ export default function StudentGroupPage() {
             </div>
           )}
 
-          {/* Meet link */}
-          <div className="bg-card border rounded-2xl p-6">
-            <h3 className="font-cairo text-lg font-extrabold mb-4 flex items-center gap-2">
-              <span className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center">
-                <Video className="w-5 h-5 text-red-500" />
-              </span>
-              الحصة المباشرة
-            </h3>
-            {!nextLiveLesson ? (
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
-                <Clock className="w-6 h-6 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="font-bold">لا توجد حصة قادمة</p>
-                  <p className="text-sm text-muted-foreground">
-                    سيظهر رابط الحصة المباشرة في موعدها
-                  </p>
-                </div>
-              </div>
-            ) : isLessonUnlocked(nextLiveLesson) &&
-              canJoinLive(nextLiveLesson) &&
-              (nextLiveLesson.meetingLink || group.googleMeetLink) ? (
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                <Unlock className="w-6 h-6 text-emerald-500 shrink-0" />
-                <div className="flex-1">
-                  <p className="font-bold">الرابط متاح لك</p>
-                  <p className="text-sm text-muted-foreground">
-                    يمكنك الانضمام للحصة المباشرة الآن
-                  </p>
-                </div>
-                <a
-                  href={nextLiveLesson.meetingLink || group.googleMeetLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-colors"
-                >
-                  <Video className="w-4 h-4" />
-                  فتح رابط الحصة
-                </a>
-              </div>
-            ) : isLessonUnlocked(nextLiveLesson) ? (
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
-                <Clock className="w-6 h-6 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="font-bold">يُفتح رابط الحصة قبل بدايتها بـ 15 دقيقة</p>
-                  <p className="text-sm text-muted-foreground">
-                    {nextLiveLesson.scheduledAt
-                      ? `تبدأ الحصة ${new Date(nextLiveLesson.scheduledAt).toLocaleDateString("ar-EG", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                        })}${nextLiveLesson.scheduleTime ? ` • ${nextLiveLesson.scheduleTime}` : ""}`
-                      : "ستظهر الحصة في موعدها المحدد"}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
-                <Lock className="w-6 h-6 text-muted-foreground shrink-0" />
-                <div className="flex-1">
-                  <p className="font-bold">الحصة المباشرة القادمة</p>
-                  <p className="text-sm text-muted-foreground">
-                    {nextLiveLesson.title} — افتح الحصة للحصول على رابط البث المباشر
-                  </p>
-                </div>
-                {canAffordLesson ? (
-                  <button
-                    type="button"
-                    onClick={() => openLesson(nextLiveLesson)}
-                    disabled={openingLesson === nextLiveLesson._id}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
-                  >
-                    {openingLesson === nextLiveLesson._id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Unlock className="w-4 h-4" />
-                    )}
-                    فتح الحصة المباشرة
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={scrollToBuy}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors"
-                  >
-                    <Wallet className="w-4 h-4" />
-                    اشترِ الحصص
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Lessons */}
           <div className="bg-card border rounded-2xl p-6">
             <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
@@ -781,104 +675,6 @@ export default function StudentGroupPage() {
                   })}
                 </div>
 
-                {/* Featured next live lesson */}
-                {lessonFilter === "ALL" && nextLiveLesson && (
-                  <div
-                    className={`relative overflow-hidden rounded-2xl border p-5 mb-4 ${
-                      canJoinLive(nextLiveLesson)
-                        ? "border-emerald-500/40 bg-gradient-to-l from-emerald-500/15 via-emerald-500/5 to-transparent"
-                        : "border-violet-500/30 bg-gradient-to-l from-violet-500/10 via-violet-500/5 to-transparent"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-3">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                          canJoinLive(nextLiveLesson)
-                            ? "bg-emerald-500 text-white"
-                            : "bg-violet-500/10 text-violet-600 dark:text-violet-400"
-                        }`}
-                      >
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            canJoinLive(nextLiveLesson)
-                              ? "bg-white animate-pulse"
-                              : "bg-violet-500"
-                          }`}
-                        />
-                        {canJoinLive(nextLiveLesson)
-                          ? "الحصة المباشرة الآن"
-                          : "الحصة المباشرة القادمة"}
-                      </span>
-                      {!isLessonUnlocked(nextLiveLesson) && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-[11px] font-bold text-muted-foreground">
-                          <Lock className="w-3 h-3" />
-                          تتطلب حصة
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-extrabold text-lg">
-                          {nextLiveLesson.title}
-                        </h4>
-                        <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
-                          <CalendarClock className="w-3.5 h-3.5 shrink-0" />
-                          {formatLessonTime(nextLiveLesson)}
-                        </p>
-                        {isLessonUnlocked(nextLiveLesson) &&
-                          nextLiveLesson.description && (
-                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                              {nextLiveLesson.description}
-                            </p>
-                          )}
-                        {isLessonUnlocked(nextLiveLesson) &&
-                          !canJoinLive(nextLiveLesson) && (
-                            <p className="text-xs font-medium text-muted-foreground mt-2 inline-flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5" />
-                              يُفتح رابط الحصة قبل بدايتها بـ 15 دقيقة
-                            </p>
-                          )}
-                      </div>
-                      {isLessonUnlocked(nextLiveLesson) &&
-                        canJoinLive(nextLiveLesson) &&
-                        nextLiveLesson.meetingLink ? (
-                        <a
-                          href={nextLiveLesson.meetingLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/25 transition-all hover:-translate-y-0.5"
-                        >
-                          <Video className="w-4 h-4" />
-                          انضم الآن للبث المباشر
-                        </a>
-                      ) : canAffordLesson ? (
-                        <button
-                          type="button"
-                          onClick={() => openLesson(nextLiveLesson)}
-                          disabled={openingLesson === nextLiveLesson._id}
-                          className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-bold shadow-lg transition-all hover:-translate-y-0.5 disabled:opacity-60"
-                        >
-                          {openingLesson === nextLiveLesson._id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Unlock className="w-4 h-4" />
-                          )}
-                          فتح الحصة المباشرة
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={scrollToBuy}
-                          className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-bold shadow-lg transition-all hover:-translate-y-0.5"
-                        >
-                          <Wallet className="w-4 h-4" />
-                          اشترِ الحصص
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {/* Lessons list */}
                 <div className="space-y-2.5">
                   {sortedLessons
@@ -944,7 +740,7 @@ export default function StudentGroupPage() {
                                   ) : (
                                     <Lock className="w-3 h-3" />
                                   )}
-                                  {unlocked ? "مفتوح" : "مقفل"}
+                                  {unlocked ? "مدفوعة من رصيدك" : "غير مدفوعة بعد"}
                                 </span>
                               </span>
                             </span>
@@ -1128,7 +924,7 @@ export default function StudentGroupPage() {
                               <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-5 text-center">
                                 <Lock className="w-5 h-5 mx-auto text-muted-foreground mb-2" />
                                 <p className="text-sm font-bold mb-1">
-                                  هذا الدرس غير مفتوح
+                                  هذا الدرس لم يُدفع بعد
                                 </p>
                                 <p className="text-xs text-muted-foreground mb-3">
                                   {canAffordLesson
