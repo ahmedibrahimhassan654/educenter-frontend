@@ -61,6 +61,7 @@ const studentLinks: SidebarLink[] = [
   { href: "/student/explore", label: "استكشف المجموعات", icon: Compass, color: "learning" },
   { href: "/student/my-groups", label: "مجموعاتي", icon: Users, color: "people" },
   { href: "/student/invitations", label: "المجموعات المضافة", icon: UserPlus, color: "alert" },
+  { href: "/student/wallet", label: "محفظة الحصص", icon: Wallet, color: "money" },
   { href: "/student/my-progress", label: "تقدمي", icon: BarChart3, color: "progress" },
   { href: "/student/family", label: "العائلة", icon: Users, color: "people" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },
@@ -69,6 +70,7 @@ const studentLinks: SidebarLink[] = [
 const parentLinks: SidebarLink[] = [
   { href: "/parent", label: "لوحة التحكم", icon: LayoutDashboard, color: "primary" },
   { href: "/parent/family", label: "العائلة", icon: Users, color: "people" },
+  { href: "/parent/children", label: "متابعة الأبناء", icon: GraduationCap, color: "learning" },
   { href: "/parent/payments", label: "المدفوعات", icon: Wallet, color: "money" },
   { href: "/parent/reports", label: "التقارير", icon: FileText, color: "document" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "alert" },

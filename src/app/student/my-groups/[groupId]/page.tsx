@@ -167,6 +167,7 @@ export default function StudentGroupPage() {
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
     try {
+      clearCache(`/groups/${groupId}`);
       const res = await api.get(`/groups/${groupId}`);
       const data = res.data as Group & { entitlement?: Entitlement };
       setGroup(data);
@@ -352,7 +353,9 @@ export default function StudentGroupPage() {
           : `تم شراء ${purchase?.lectures || payload.lectures} حصة بنجاح`;
       toast.success(label, {
         description:
-          "تم تسجيل الدفعة. المحفظة والدفع الإلكتروني متاحان قريباً.",
+          payload.type === "MONTHLY"
+            ? "جميع دروس المجموعة مفتوحة لك أثناء اشتراكك"
+            : "أُضيفت الحصص إلى محفظتك ويمكنك فتح الدروس منها",
         duration: 5000,
       });
       await fetchGroup();

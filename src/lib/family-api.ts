@@ -85,6 +85,48 @@ const familyApi = {
   unlinkParent: async (): Promise<void> => {
     await api.delete("/family/parent-link");
   },
+
+  /**
+   * Parent monitoring for a linked child: wallet balance, transactions, and
+   * lessons paid for from the wallet with group + lesson info.
+   */
+  getChildMonitoring: async (
+    childId: string
+  ): Promise<{
+    child: {
+      id: string;
+      name: string;
+      avatarUrl: string | null;
+      stage: string | null;
+      grade: string | null;
+    };
+    balance: number;
+    transactions: Array<{
+      id: string;
+      type: "PURCHASE" | "OPEN_LESSON";
+      amount: number;
+      notes: string;
+      groupName: string | null;
+      lessonTitle: string | null;
+      createdAt: string;
+    }>;
+    paidLessons: Array<{
+      id: string;
+      groupId: string;
+      groupName: string | null;
+      subject: string | null;
+      stage: string | null;
+      grade: string | null;
+      lessonId: string;
+      lessonTitle: string | null;
+      lessonType: string | null;
+      scheduledAt: string | null;
+      consumedAt: string;
+    }>;
+  }> => {
+    const response = await api.get(`/family/children/${childId}/monitoring`);
+    return response.data.data;
+  },
 };
 
 export default familyApi;

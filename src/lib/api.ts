@@ -51,7 +51,7 @@ const CACHE_DURATION = 30 * 1000; // 30 seconds for GET requests
 const LONG_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for rarely changing data
 
 const longCacheEndpoints = ["/curriculum", "/groups?explore=true"];
-const neverCacheEndpoints = ["/auth/"];
+const neverCacheEndpoints = ["/auth/", "/wallet"];
 
 function getCacheKey(config: {
   method?: string;
