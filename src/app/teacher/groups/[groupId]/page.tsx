@@ -212,6 +212,19 @@ export default function GroupDetailPage() {
     }
   }, [groupId]);
 
+  // Lessons are always shown in the order of their live-session date (soonest
+  // first). Lessons without a scheduled date trail at the end in creation order.
+  const sortedLessons = useMemo(() => {
+    return [...lessons].sort((a, b) => {
+      const ta = a.scheduledAt ? new Date(a.scheduledAt).getTime() : null;
+      const tb = b.scheduledAt ? new Date(b.scheduledAt).getTime() : null;
+      if (ta !== null && tb !== null) return ta - tb;
+      if (ta === null && tb === null)
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return ta === null ? 1 : -1;
+    });
+  }, [lessons]);
+
   useEffect(() => {
     if (groupId) {
       fetchGroup();
@@ -910,7 +923,7 @@ export default function GroupDetailPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {lessons.map((lesson) => {
+              {sortedLessons.map((lesson) => {
                 const meta = LESSON_TYPE_META[lesson.type];
                 const href =
                   lesson.type === "LIVE"

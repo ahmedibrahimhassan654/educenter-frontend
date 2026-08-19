@@ -228,7 +228,7 @@ export default function VideoPlayer({
       {error && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/70 text-white/90 text-sm font-bold text-center px-6">
           <TriangleAlert className="w-10 h-10 text-amber-400" />
-          تعذر تشغيل الفيديو — قد تكون الصلاحية منتهية. أعد فتح الدرس للمحاولة مجدداً.
+          تعذر تشغيل الفيديو — تحقق من اتصال الإنترنت وأعد المحاولة.
         </div>
       )}
 
