@@ -5,8 +5,15 @@ export interface AIContent {
   userId: string;
   type: "DOCUMENT" | "VIDEO_TRANSCRIPT";
   title: string;
-  sourceType: "SESSION_RECORDING" | "UPLOAD" | "CURRICULUM";
+  sourceType:
+    | "SESSION_RECORDING"
+    | "UPLOAD"
+    | "CURRICULUM"
+    | "LESSON_DOCUMENT"
+    | "LESSON_VIDEO";
   sourceId?: string;
+  lessonId?: string;
+  groupId?: string;
   status: "PROCESSING" | "READY" | "ERROR";
   error?: string;
   metadata: {
@@ -39,7 +46,8 @@ export interface GeneratedContent {
   _id: string;
   userId: string;
   contentId: string;
-  type: "QUESTIONS" | "SUMMARY" | "FLASHCARDS" | "STUDY_NOTES";
+  lessonId?: string;
+  type: "QUESTIONS" | "SUMMARY" | "FLASHCARDS" | "STUDY_NOTES" | "HOMEWORK";
   title: string;
   data: any;
   config: {
@@ -151,9 +159,37 @@ const aiApi = {
   sendMessage: async (
     chatId: string,
     contentId: string | undefined,
-    messages: ChatMessage[]
+    messages: ChatMessage[],
+    lessonId?: string
   ): Promise<ApiResponse<{ messageId: string }>> => {
-    const { data } = await api.post("/ai/chat", { chatId, contentId, messages });
+    const { data } = await api.post("/ai/chat", { chatId, contentId, lessonId, messages });
+    return data;
+  },
+
+  indexLessonAI: async (
+    groupId: string,
+    lessonId: string
+  ): Promise<
+    ApiResponse<Array<{ kind: string; title: string; status: string }>>
+  > => {
+    const { data } = await api.post(
+      `/groups/${groupId}/lessons/${lessonId}/ai/index`
+    );
+    return data;
+  },
+
+  getLessonAI: async (
+    groupId: string,
+    lessonId: string
+  ): Promise<
+    ApiResponse<{
+      materials: any[];
+      generated: GeneratedContent[];
+    }>
+  > => {
+    const { data } = await api.get(
+      `/groups/${groupId}/lessons/${lessonId}/ai`
+    );
     return data;
   },
 
@@ -180,7 +216,8 @@ const aiApi = {
   },
 
   generateQuestions: async (params: {
-    contentId: string;
+    contentId?: string;
+    lessonId?: string;
     count?: number;
     difficulty?: string;
     language?: string;
@@ -199,8 +236,9 @@ const aiApi = {
   },
 
   generateSummary: async (
-    contentId: string,
-    language?: string
+    contentId?: string,
+    language?: string,
+    lessonId?: string
   ): Promise<
     ApiResponse<{
       id: string;
@@ -210,14 +248,19 @@ const aiApi = {
       createdAt: string;
     }>
   > => {
-    const { data } = await api.post("/ai/generate-summary", { contentId, language });
+    const { data } = await api.post("/ai/generate-summary", {
+      contentId,
+      lessonId,
+      language,
+    });
     return data;
   },
 
   generateFlashcards: async (
-    contentId: string,
+    contentId?: string,
     count?: number,
-    language?: string
+    language?: string,
+    lessonId?: string
   ): Promise<
     ApiResponse<{
       id: string;
@@ -227,13 +270,19 @@ const aiApi = {
       createdAt: string;
     }>
   > => {
-    const { data } = await api.post("/ai/generate-flashcards", { contentId, count, language });
+    const { data } = await api.post("/ai/generate-flashcards", {
+      contentId,
+      count,
+      language,
+      lessonId,
+    });
     return data;
   },
 
   generateNotes: async (
-    contentId: string,
-    language?: string
+    contentId?: string,
+    language?: string,
+    lessonId?: string
   ): Promise<
     ApiResponse<{
       id: string;
@@ -243,7 +292,37 @@ const aiApi = {
       createdAt: string;
     }>
   > => {
-    const { data } = await api.post("/ai/generate-notes", { contentId, language });
+    const { data } = await api.post("/ai/generate-notes", {
+      contentId,
+      language,
+      lessonId,
+    });
+    return data;
+  },
+
+  generateHomework: async (params: {
+    groupId: string;
+    lessonId: string;
+    count?: number;
+    difficulty?: string;
+    language?: string;
+  }): Promise<
+    ApiResponse<{
+      id: string;
+      type: string;
+      title: string;
+      homework: any;
+      createdAt: string;
+    }>
+  > => {
+    const { data } = await api.post(
+      `/groups/${params.groupId}/lessons/${params.lessonId}/ai/homework`,
+      {
+        count: params.count,
+        difficulty: params.difficulty,
+        language: params.language,
+      }
+    );
     return data;
   },
 
@@ -295,7 +374,8 @@ export async function streamChat(
   contentId: string | undefined,
   messages: ChatMessage[],
   onChunk: (chunk: string) => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
+  lessonId?: string
 ): Promise<string> {
   const { getStoredToken } = await import("./api");
   const token = getStoredToken();
@@ -313,7 +393,7 @@ export async function streamChat(
     const response = await fetch(`${apiUrl}/ai/chat`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ contentId, messages }),
+      body: JSON.stringify({ contentId, lessonId, messages }),
     });
 
     if (!response.ok) {

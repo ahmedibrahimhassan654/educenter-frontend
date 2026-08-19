@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import api, { clearCache } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import VideoPlayer from "@/components/video-player";
-import { OfflineVideoSection } from "@/components/offline-download";
 import { Group, Entitlement } from "@/types";
 import { getSubjectColor } from "@/lib/subject-colors";
 import { canJoinLive } from "@/lib/lesson-time";
@@ -34,8 +33,6 @@ import {
   Link2,
   PlayCircle,
   CalendarClock,
-  ChevronDown,
-  ChevronUp,
   CircleDollarSign,
 } from "lucide-react";
 
@@ -65,7 +62,6 @@ interface StudentLesson {
   hasRecordedVideo?: boolean;
   hasDocuments?: boolean;
   hasLinks?: boolean;
-  _contentLoaded?: boolean;
 }
 
 const STUDENT_LESSON_META: Record<
@@ -156,8 +152,6 @@ export default function StudentGroupPage() {
   const [lessons, setLessons] = useState<StudentLesson[]>([]);
   const [lessonsLoading, setLessonsLoading] = useState(false);
   const [lessonFilter, setLessonFilter] = useState<LessonFilter>("ALL");
-  const [openLessons, setOpenLessons] = useState<Set<string>>(new Set());
-  const [openingLesson, setOpeningLesson] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [selectedPack, setSelectedPack] = useState(4);
@@ -216,8 +210,8 @@ export default function StudentGroupPage() {
   }, [lessons]);
 
   // A lesson is unlocked once the student paid for it (opened it once) or a
-  // monthly subscription is active. Content is fetched per lesson via the open
-  // endpoint and merged into the lesson object (_contentLoaded marks it).
+  // monthly subscription is active. Each row navigates to the dedicated lesson
+  // study page which handles opening/buying and shows the full content.
   const scrollToBuy = useCallback(() => {
     document
       .getElementById("buy-section")
@@ -226,96 +220,12 @@ export default function StudentGroupPage() {
 
   const isLessonUnlocked = useCallback(
     (lesson: StudentLesson) =>
-      entitlement?.monthlyActive ||
-      Boolean(lesson.opened) ||
-      Boolean(lesson._contentLoaded),
+      entitlement?.monthlyActive || Boolean(lesson.opened),
     [entitlement?.monthlyActive]
   );
 
   const canAffordLesson = Boolean(
     entitlement?.monthlyActive || (entitlement?.remainingCredits ?? 0) > 0
-  );
-
-  const toggleLesson = useCallback((lessonId: string) => {
-    setOpenLessons((prev) => {
-      const next = new Set(prev);
-      if (next.has(lessonId)) next.delete(lessonId);
-      else next.add(lessonId);
-      return next;
-    });
-  }, []);
-
-  // Open a lesson: the first time it consumes one credit (unless the student is
-  // on a monthly subscription) and fetches the full content. Already-unlocked
-  // lessons with loaded content just expand/collapse; unlocked lessons whose
-  // content is not in the list (e.g. after a page reload) refetch it for free.
-  // Students without credits see the lock prompt instead.
-  const openLesson = useCallback(
-    async (lesson: StudentLesson) => {
-      if (openingLesson) return;
-      const unlocked = isLessonUnlocked(lesson);
-      if (unlocked && lesson._contentLoaded) {
-        toggleLesson(lesson._id);
-        return;
-      }
-      if (!unlocked && !canAffordLesson) {
-        toggleLesson(lesson._id);
-        return;
-      }
-      setOpeningLesson(lesson._id);
-      try {
-        const res = await api.post(`/groups/${groupId}/lessons/${lesson._id}/open`);
-        const content = res.data?.data;
-        const consumedCredit = Boolean(res.data?.consumedCredit);
-        setLessons((prev) =>
-          prev.map((l) =>
-            l._id === lesson._id
-              ? { ...l, ...content, opened: true, _contentLoaded: true }
-              : l
-          )
-        );
-        const remaining = res.data?.remainingCredits;
-        if (typeof remaining === "number") {
-          setEntitlement((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  remainingCredits: remaining,
-                  monthlyActive: Boolean(res.data?.monthlyActive),
-                  hasAccess: Boolean(
-                    prev.monthlyActive || remaining > 0
-                  ),
-                }
-              : prev
-          );
-        }
-        setOpenLessons((prev) => new Set(prev).add(lesson._id));
-        if (consumedCredit) {
-          toast.success("تم فتح الدرس", {
-            description: "تم خصم حصة واحدة من رصيدك",
-          });
-        }
-      } catch (error) {
-        const axiosError = error as {
-          response?: { status?: number; data?: { message?: string } };
-        };
-        if (axiosError.response?.status === 402) {
-          toast.error(
-            axiosError.response?.data?.message ||
-              "لا توجد حصص متبقية — اشترِ حصصاً لفتح الدرس",
-            { description: "يمكنك شراء حصص أو تفعيل اشتراك شهري" }
-          );
-          scrollToBuy();
-        } else {
-          toast.error(
-            axiosError.response?.data?.message || "فشل في فتح الدرس"
-          );
-        }
-      } finally {
-        setOpeningLesson(null);
-      }
-    },
-    [groupId, openingLesson, isLessonUnlocked, canAffordLesson, toggleLesson, scrollToBuy]
   );
 
   // Re-render periodically so the live join button appears automatically once
@@ -688,20 +598,19 @@ export default function StudentGroupPage() {
                       const status =
                         lesson.type === "LIVE" ? liveStatus(lesson) : null;
                       const unlocked = isLessonUnlocked(lesson);
-                      const isOpen = openLessons.has(lesson._id);
-                      const isBusy = openingLesson === lesson._id;
                       return (
-                        <div
+                        <button
                           key={lesson._id}
-                          className={`rounded-2xl border overflow-hidden transition-all ${
+                          type="button"
+                          onClick={() =>
+                            router.push(
+                              `/student/my-groups/${groupId}/lessons/${lesson._id}`
+                            )
+                          }
+                          className={`w-full flex items-center gap-3 p-4 text-right rounded-2xl border transition-all hover:shadow-sm hover:-translate-y-0.5 ${
                             unlocked ? "bg-card" : "bg-muted/40 border-dashed"
                           }`}
                         >
-                          <button
-                            type="button"
-                            onClick={() => openLesson(lesson)}
-                            className="w-full flex items-center gap-3 p-4 text-right hover:bg-muted/40 transition-colors"
-                          >
                             <span className="shrink-0 w-8 h-8 rounded-lg bg-muted text-muted-foreground text-xs font-bold flex items-center justify-center">
                               {index + 1}
                             </span>
@@ -747,222 +656,8 @@ export default function StudentGroupPage() {
                                 </span>
                               </span>
                             </span>
-                            {isBusy ? (
-                              <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
-                            ) : isOpen ? (
-                              <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" />
-                            ) : (
-                              <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" />
-                            )}
+                            <ArrowLeft className="w-4 h-4 text-muted-foreground shrink-0 rotate-180" />
                           </button>
-
-                          {isOpen && (
-                            <div className="border-t px-4 py-4 bg-muted/30 space-y-3">
-                              {unlocked ? (
-                              <>
-                                {lesson.description && (
-                                  <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
-                                    {lesson.description}
-                                  </p>
-                                )}
-
-                                <div className="mt-3 space-y-3">
-                                  {lesson.type === "LIVE" && (
-                                    <div className="flex flex-wrap items-center gap-2.5">
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/60 text-xs font-medium text-muted-foreground">
-                                        <CalendarClock className="w-3.5 h-3.5" />
-                                        {formatLessonTime(lesson)}
-                                      </span>
-                                      {canJoinLive(lesson) && lesson.meetingLink ? (
-                                        <a
-                                          href={lesson.meetingLink}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 transition-colors"
-                                        >
-                                          <Video className="w-3.5 h-3.5" />
-                                          انضمام للبث المباشر
-                                        </a>
-                                      ) : (
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground rounded-lg text-xs font-medium">
-                                          <Clock className="w-3.5 h-3.5" />
-                                          يُفتح رابط الحصة قبل بدايتها بـ 15 دقيقة
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {lesson.type === "LIVE" &&
-                                    lesson.recordedLiveVideoUrl && (
-                                      <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-3 space-y-2">
-                                        <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                                          <Radio className="w-3.5 h-3.5" />
-                                          تسجيل الحصة
-                                        </p>
-                                        <OfflineVideoSection
-                                          groupId={groupId}
-                                          lessonId={lesson._id}
-                                          field="recordedLiveVideoUrl"
-                                          url={lesson.recordedLiveVideoUrl}
-                                          title="تسجيل الحصة"
-                                          className="w-full max-h-56"
-                                        />
-                                      </div>
-                                    )}
-
-                                  {lesson.type === "LIVE" &&
-                                    lesson.recordedVideoUrl && (
-                                      <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 space-y-2">
-                                        <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                                          <PlayCircle className="w-3.5 h-3.5" />
-                                          فيديو إضافي
-                                        </p>
-                                        <OfflineVideoSection
-                                          groupId={groupId}
-                                          lessonId={lesson._id}
-                                          field="recordedVideoUrl"
-                                          url={lesson.recordedVideoUrl}
-                                          title="فيديو إضافي"
-                                          className="w-full max-h-56"
-                                        />
-                                      </div>
-                                    )}
-
-                                  {lesson.type === "LIVE" &&
-                                    Array.isArray(lesson.documents) &&
-                                    lesson.documents.length > 0 && (
-                                      <div className="space-y-1.5">
-                                        <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                                          <FileText className="w-3.5 h-3.5" />
-                                          المستندات ({lesson.documents.length})
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                          {lesson.documents.map((doc, i) => (
-                                            <a
-                                              key={i}
-                                              href={doc}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
-                                            >
-                                              <FileText className="w-3.5 h-3.5" />
-                                              فتح المستند {i + 1}
-                                            </a>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                  {lesson.type === "LIVE" &&
-                                    Array.isArray(lesson.referenceLinks) &&
-                                    lesson.referenceLinks.length > 0 && (
-                                      <div className="space-y-1.5">
-                                        <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                                          <Link2 className="w-3.5 h-3.5" />
-                                          الروابط المرجعية ({lesson.referenceLinks.length})
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                          {lesson.referenceLinks.map((link, i) => (
-                                            <a
-                                              key={i}
-                                              href={link}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
-                                            >
-                                              <Link2 className="w-3.5 h-3.5" />
-                                              فتح الرابط المرجعي {i + 1}
-                                            </a>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                  {lesson.type === "RECORDED" && lesson.videoUrl && (
-                                    <div className="flex flex-wrap gap-2">
-                                      <a
-                                        href={lesson.videoUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
-                                      >
-                                        <PlayCircle className="w-3.5 h-3.5" />
-                                        مشاهدة الفيديو
-                                      </a>
-                                    </div>
-                                  )}
-
-                                  {lesson.type === "DOCUMENT" &&
-                                    lesson.documentUrl && (
-                                      <div className="flex flex-wrap gap-2">
-                                        <a
-                                          href={lesson.documentUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
-                                        >
-                                          <FileText className="w-3.5 h-3.5" />
-                                          فتح المستند
-                                        </a>
-                                      </div>
-                                    )}
-
-                                  {lesson.type === "LINK" &&
-                                    lesson.referenceUrl && (
-                                      <div className="flex flex-wrap gap-2">
-                                        <a
-                                          href={lesson.referenceUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors"
-                                        >
-                                          <Link2 className="w-3.5 h-3.5" />
-                                          فتح الرابط المرجعي
-                                        </a>
-                                      </div>
-                                    )}
-                                </div>
-                              </>
-                            ) : (
-                              <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-5 text-center">
-                                <Lock className="w-5 h-5 mx-auto text-muted-foreground mb-2" />
-                                <p className="text-sm font-bold mb-1">
-                                  هذا الدرس لم يُدفع بعد
-                                </p>
-                                <p className="text-xs text-muted-foreground mb-3">
-                                  {canAffordLesson
-                                    ? "افتح الدرس لخصم حصة واحدة من رصيدك ومشاهدة البث المباشر والفيديوهات والمستندات"
-                                    : "لا توجد حصص متبقية في رصيدك — اشترِ الحصص أو فعّل اشتراكاً شهرياً"}
-                                </p>
-                                {canAffordLesson ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => openLesson(lesson)}
-                                    disabled={isBusy}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
-                                  >
-                                    {isBusy ? (
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                      <Unlock className="w-4 h-4" />
-                                    )}
-                                    فتح الدرس (حصة واحدة)
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={scrollToBuy}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors"
-                                  >
-                                    <Wallet className="w-4 h-4" />
-                                    اشترِ الحصص
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                            </div>
-                          )}
-                        </div>
                       );
                     })}
 

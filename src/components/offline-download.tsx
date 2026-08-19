@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Download, Loader2, Trash2 } from "lucide-react";
+import api from "@/lib/api";
 import VideoPlayer from "@/components/video-player";
 import {
   StoredVideo,
@@ -233,9 +234,20 @@ export function OfflineVideoSection({
   const videoKey = `${groupId}:${lessonId}:${field}`;
   const { src, applyBlob } = useOfflineVideoSrc(url, videoKey);
 
+  // Signed Supabase URLs expire; when the player fails, fetch a fresh one.
+  const isSignedSupabaseUrl = url.includes("/storage/v1/object/sign/");
+  const refreshSrc = isSignedSupabaseUrl
+    ? () =>
+        api
+          .get(
+            `/groups/${groupId}/lessons/${lessonId}/video/signed?field=${encodeURIComponent(field)}`
+          )
+          .then((res) => res.data?.url as string)
+    : undefined;
+
   return (
     <div className="space-y-2">
-      <VideoPlayer src={src} className={className} />
+      <VideoPlayer src={src} className={className} refreshSrc={refreshSrc} />
       <OfflineDownload
         groupId={groupId}
         lessonId={lessonId}

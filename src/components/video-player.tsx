@@ -21,6 +21,11 @@ interface VideoPlayerProps {
   poster?: string;
   className?: string;
   title?: string;
+  /**
+   * Called when playback fails (e.g. an expired signed URL) to fetch a fresh
+   * source. The player swaps it in and resumes from the last known position.
+   */
+  refreshSrc?: () => Promise<string>;
 }
 
 function formatTime(seconds: number): string {
@@ -42,10 +47,13 @@ export default function VideoPlayer({
   poster,
   className,
   title,
+  refreshSrc,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshAttempted = useRef(false);
+  const lastKnownTime = useRef(0);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -58,6 +66,42 @@ export default function VideoPlayer({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [pipSupported, setPipSupported] = useState(false);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    refreshAttempted.current = false;
+  }, [src]);
+
+  // When playback fails on an expiring signed URL, swap in a fresh source and
+  // resume from where the user was watching (only attempted once per src).
+  const handleError = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!refreshSrc || refreshAttempted.current) {
+      setError(true);
+      return;
+    }
+    refreshAttempted.current = true;
+    setWaiting(true);
+    try {
+      const fresh = await refreshSrc();
+      if (!fresh) {
+        setError(true);
+        return;
+      }
+      const resumeAt = lastKnownTime.current;
+      video.src = fresh;
+      video.load();
+      setError(false);
+      if (resumeAt > 0 && Number.isFinite(video.duration)) {
+        video.currentTime = resumeAt;
+      }
+      void video.play().catch(() => setError(true));
+    } catch {
+      setError(true);
+    } finally {
+      setWaiting(false);
+    }
+  }, [refreshSrc]);
 
   useEffect(() => {
     setPipSupported(
@@ -187,8 +231,11 @@ export default function VideoPlayer({
           setPlaying(false);
           setControlsVisible(true);
         }}
-        onError={() => setError(true)}
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onError={handleError}
+        onTimeUpdate={(e) => {
+          lastKnownTime.current = e.currentTarget.currentTime;
+          setCurrentTime(e.currentTarget.currentTime);
+        }}
         onLoadedMetadata={(e) => {
           setDuration(e.currentTarget.duration);
           setVolume(e.currentTarget.volume);

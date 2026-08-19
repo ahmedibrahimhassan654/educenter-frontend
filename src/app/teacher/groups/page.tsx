@@ -65,6 +65,17 @@ function getStageFromGrade(grade: string): string {
   return "ثانوي";
 }
 
+// Fire-and-forget: remux the group description video with faststart so the
+// browser can start playing it immediately. Best-effort — failures are ignored
+// (the public URL still works, it just buffers more).
+function fireGroupVideoOptimize(groupId: string): void {
+  api
+    .post(`/groups/${groupId}/video/optimize`)
+    .catch(() => {
+      // ignore — optimization is best-effort
+    });
+}
+
 interface ScheduleSlot {
   day: string;
   time: string;
@@ -388,7 +399,8 @@ export default function TeacherGroupsPage() {
         (s) => `${s.day} ${s.time}`
       );
       if (editingGroup) {
-        await api.put(`/groups/${editingGroup._id || editingGroup.id}`, {
+        const gid = editingGroup._id || editingGroup.id;
+        await api.put(`/groups/${gid}`, {
           title: formData.title,
           subject: formData.subject,
           grade: formData.grade,
@@ -399,6 +411,7 @@ export default function TeacherGroupsPage() {
           scheduleDays,
         });
         toast.success("تم تحديث المجموعة بنجاح");
+        if (formData.descriptionVideo && gid) fireGroupVideoOptimize(gid);
       } else {
         const newGroup = await api.post("/groups", {
           title: formData.title,
@@ -415,6 +428,10 @@ export default function TeacherGroupsPage() {
         const createdGroup = newGroup.data;
         if (createdGroup) {
           setGroups((prev) => [createdGroup, ...prev]);
+          const gid = createdGroup._id || createdGroup.id;
+          if (formData.descriptionVideo && gid) {
+            fireGroupVideoOptimize(gid);
+          }
         }
       }
 

@@ -7,10 +7,17 @@ import { streamChat, ChatMessage } from "@/lib/ai-api";
 
 interface AIChatProps {
   contentId?: string;
+  lessonId?: string;
   contentTitle?: string;
+  onNewChat?: () => void;
 }
 
-export default function AIChat({ contentId, contentTitle }: AIChatProps) {
+export default function AIChat({
+  contentId,
+  lessonId,
+  contentTitle,
+  onNewChat,
+}: AIChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +48,8 @@ export default function AIChat({ contentId, contentTitle }: AIChatProps) {
         (chunk) => {
           setStreamingContent((prev) => prev + chunk);
         },
-        () => {}
+        () => {},
+        lessonId
       );
 
       setMessages((prev) => [...prev, { role: "assistant", content: response }]);
@@ -88,7 +96,7 @@ export default function AIChat({ contentId, contentTitle }: AIChatProps) {
               مرحباً! كيف يمكنني مساعدتك؟
             </h3>
             <p className="text-sm text-muted-foreground max-w-md">
-              {contentId
+              {contentId || lessonId
                 ? "اسألني أي سؤال عن المحتوى المحدد"
                 : "اسألني أي سؤال دراسي وسأساعدك في فهمه"}
             </p>
