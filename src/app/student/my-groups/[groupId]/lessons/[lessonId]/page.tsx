@@ -92,11 +92,11 @@ export default function StudentLessonPage() {
       const found = list.find((l) => l._id === lessonId) || null;
       setLesson(found);
 
-      // If already unlocked (opened or monthly), fetch the full content for free.
+      // Auto-fetch the full content only when the lesson is already unlocked
+      // (paid for earlier or a monthly subscription is active). We never open
+      // it here: opening consumes one credit and must be an explicit action.
       const unlocked = Boolean(
-        groupData.entitlement?.monthlyActive ||
-          found?.opened ||
-          found?.type === "LIVE"
+        groupData.entitlement?.monthlyActive || found?.opened
       );
       if (unlocked) {
         await openLessonContent(found?._id || lessonId);
@@ -283,7 +283,38 @@ export default function StudentLessonPage() {
 
       {!unlocked ? (
         /* Locked state: open (consume a credit) or buy */
-        <div className="bg-card border rounded-3xl p-8 max-w-2xl mx-auto text-center">
+        <div className="space-y-5 max-w-2xl mx-auto">
+          {/* Live sessions stay joinable without opening the lesson */}
+          {activeLesson.type === "LIVE" && (
+            <div className="bg-card border rounded-3xl p-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Video className="w-4 h-4 text-primary" />
+                {activeLesson.scheduledAt
+                  ? new Date(activeLesson.scheduledAt).toLocaleString("ar-EG")
+                  : activeLesson.scheduleDay
+                  ? `${activeLesson.scheduleDay} • ${activeLesson.scheduleTime || ""}`
+                  : "درس مباشر"}
+              </div>
+              {canJoinLive(activeLesson) && activeLesson.meetingLink ? (
+                <a
+                  href={activeLesson.meetingLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-colors"
+                >
+                  <Video className="w-4 h-4" />
+                  انضمام للبث المباشر
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground rounded-lg text-xs font-medium">
+                  <Lock className="w-3.5 h-3.5" />
+                  يُفتح رابط الحصة قبل بدايتها بـ 15 دقيقة
+                </span>
+              )}
+            </div>
+          )}
+
+        <div className="bg-card border rounded-3xl p-8 text-center">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
             <Lock className="w-8 h-8 text-primary" />
           </div>
@@ -349,6 +380,7 @@ export default function StudentLessonPage() {
               <span>{monthlyPrice} ج.م</span>
             </button>
           </div>
+        </div>
         </div>
       ) : (
         <>
